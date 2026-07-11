@@ -1,0 +1,12 @@
+[
+  {
+    "title": "第一首測試歌",
+    "artist": "歌手 A",
+    "src": "songs/song1.mp3"
+  },
+  {
+    "title": "第二首測試歌",
+    "artist": "歌手 B",
+    "src": "songs/song2.mp3"
+  }
+]
