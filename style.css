@@ -2,66 +2,172 @@ body {
     background-color: #121212;
     color: #ffffff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
     margin: 0;
+    padding-bottom: 80px; /* 留空間給底部的導覽列 */
 }
 
+/* 底部固定導覽列 */
+.navbar {
+    display: flex;
+    justify-content: space-around;
+    background-color: #1e1e1e;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    padding: 12px 0;
+    box-shadow: 0 -3px 15px rgba(0,0,0,0.6);
+    z-index: 100;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    color: #b3b3b3;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.2s;
+}
+
+.nav-btn.active {
+    color: #1db954; /* 經典音樂綠 */
+    font-weight: bold;
+}
+
+.main-container {
+    padding: 20px;
+    max-width: 450px;
+    margin: 0 auto;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 聽歌主選單大按鈕 */
+.sub-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 40px;
+}
+
+.menu-btn, .action-btn {
+    background-color: #1e1e1e;
+    color: white;
+    border: 1px solid #333;
+    padding: 20px;
+    border-radius: 12px;
+    font-size: 18px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.2s;
+}
+
+.action-btn {
+    background-color: #1db954;
+    text-align: center;
+    border: none;
+    margin-top: 15px;
+    width: 100%;
+    font-weight: bold;
+}
+
+.menu-btn:hover { background-color: #282828; }
+
+/* 項目清單列樣式 */
+.item-row {
+    background-color: #1e1e1e;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    border-left: 4px solid transparent;
+}
+
+.item-row:hover {
+    background-color: #282828;
+    border-left: 4px solid #1db954;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: #1db954;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+/* 播放器面板 */
 .player-container {
     background-color: #1e1e1e;
     padding: 30px;
     border-radius: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     text-align: center;
-    width: 300px;
 }
 
-h2 {
-    margin-bottom: 5px;
-    font-size: 24px;
-}
-
-p {
-    color: #b3b3b3;
-    margin-top: 0;
-    font-size: 16px;
-}
-
-/* 進度條樣式 */
 .progress-container {
     background-color: #333333;
     border-radius: 5px;
     cursor: pointer;
     margin: 25px 0;
     height: 6px;
-    width: 100%;
 }
 
 .progress {
-    background-color: #1db954; /* 質感音樂綠 */
+    background-color: #1db954;
     border-radius: 5px;
     height: 100%;
     width: 0%;
-    transition: width 0.1s linear;
 }
 
-/* 按鈕樣式 */
 .controls button {
     background: none;
     border: none;
     color: #b3b3b3;
-    font-size: 20px;
+    font-size: 22px;
     margin: 0 15px;
     cursor: pointer;
-    transition: color 0.2s, transform 0.1s;
 }
 
-.controls button:hover {
-    color: #ffffff;
+/* 表單卡片 */
+.card {
+    background-color: #1e1e1e;
+    padding: 25px;
+    border-radius: 15px;
 }
 
-.controls button:active {
-    transform: scale(0.9);
+input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    background-color: #282828;
+    border: 1px solid #444;
+    border-radius: 8px;
+    color: white;
+    box-sizing: border-box;
 }
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 5px 0;
+}
+
+.checkbox-item input {
+    width: 18px;
+    height: 18px;
+}
+
+.hidden { display: none !important; }
+.status-msg { margin-top: 10px; color: #1db954; font-size: 14px; text-align: center; }
+.hidden-msg { color: #aaa; line-height: 1.6; background: #282828; padding: 20px; border-radius: 10px; text-align: center; }

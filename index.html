@@ -3,27 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的私人音樂盒</title>
+    <title>我的私人音樂盒 PRO</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="player-container">
-        <h2 id="title">歌曲載入中...</h2>
-        <p id="artist">歌手名稱</p>
+    <!-- 頂部主容器 -->
+    <div class="main-container">
+        
+        <!-- ================= 1. 聽歌分頁 ================= -->
+        <div id="listen-tab" class="tab-content active">
+            <!-- 聽歌首頁子選單 -->
+            <div id="listen-menu" class="sub-menu">
+                <button class="menu-btn" onclick="showSongList('all')">🌐 所有歌曲</button>
+                <button class="menu-btn" onclick="showPlaylistList()">🗂️ 分類歌單</button>
+            </div>
 
-        <audio id="audio"></audio>
+            <!-- 分類歌單選取區 -->
+            <div id="playlist-selector-view" class="list-view hidden">
+                <button class="back-btn" onclick="backToListenMenu()">⬅️ 返回主選單</button>
+                <h3>選擇歌單</h3>
+                <div id="playlist-names-container"></div>
+            </div>
 
-        <div class="progress-container" id="progress-container">
-            <div class="progress" id="progress"></div>
+            <!-- 歌曲清單顯示區 -->
+            <div id="song-list-view" class="list-view hidden">
+                <button class="back-btn" onclick="backToListenMenu()">⬅️ 返回主選單</button>
+                <h3 id="list-title">歌曲列表</h3>
+                <div id="songs-container"></div>
+            </div>
+
+            <!-- 核心播放器面板 (點歌後才跳出) -->
+            <div id="player-view" class="player-container hidden">
+                <button class="back-btn" onclick="backToSongList()">⬅️ 返回歌曲清單</button>
+                <h2 id="title">歌曲載入中...</h2>
+                <p id="artist">歌手名稱</p>
+                <audio id="audio"></audio>
+                <div class="progress-container" id="progress-container">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <div class="controls">
+                    <button id="prev">⏮ 上一首</button>
+                    <button id="play">▶ 播放</button>
+                    <button id="next">⏭ 下一首</button>
+                </div>
+            </div>
         </div>
 
-        <div class="controls">
-            <button id="prev">⏮ 上一首</button>
-            <button id="play">▶ 播放</button>
-            <button id="next">⏭ 下一首</button>
+        <!-- ================= 2. 新增歌曲分頁 ================= -->
+        <div id="add-tab" class="tab-content">
+            <div class="card">
+                <h3>📥 從 YouTube 下載新歌曲</h3>
+                <div id="local-add-form" class="form-group">
+                    <input type="text" id="yt-url" placeholder="請貼上 YouTube 網址">
+                    <input type="text" id="song-title" placeholder="歌曲名稱 (例如: 青花瓷)">
+                    <input type="text" id="song-artist" placeholder="歌手名稱 (例如: 周傑倫)">
+                    <input type="text" id="song-filename" placeholder="英文副檔名 (例如: qingtian)">
+                    <button class="action-btn" onclick="downloadYouTubeSong()">開始全自動線上下載轉檔</button>
+                    <p id="add-status" class="status-msg"></p>
+                </div>
+                <div id="github-add-msg" class="hidden-msg hidden">
+                    <p>💡 提示：手機網頁版不支援直接下載歌曲。請在電腦上執行 <code>python app.py</code> 來使用全自動下載功能！</p>
+                </div>
+            </div>
         </div>
+
+        <!-- ================= 3. 建立歌單分頁 ================= -->
+        <div id="playlist-tab" class="tab-content">
+            <div class="card">
+                <h3>📂 建立新分類歌單</h3>
+                <div id="local-playlist-form">
+                    <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 抖音歌、休閒聽)">
+                    <h4>勾選要歸類進去的歌曲：</h4>
+                    <div id="playlist-songs-checkboxes"></div>
+                    <button class="action-btn" onclick="createPlaylist()">確認儲存歌單</button>
+                    <p id="playlist-status" class="status-msg"></p>
+                </div>
+                <div id="github-playlist-msg" class="hidden-msg hidden">
+                    <p>💡 提示：手機網頁版不支援修改歌單。請在電腦上執行 <code>python app.py</code> 來進行歌單分類與儲存！</p>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <!-- 底部固定導覽列 -->
+    <nav class="navbar">
+        <button class="nav-btn active" onclick="switchTab('listen-tab')">🎵 聽歌</button>
+        <button class="nav-btn" onclick="switchTab('add-tab')">📥 新增歌曲</button>
+        <button class="nav-btn" onclick="switchTab('playlist-tab')">📂 建立歌單</button>
+    </nav>
 
     <script src="script.js"></script>
 </body>
