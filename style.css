@@ -87,13 +87,47 @@ body {
     border-radius: 10px;
     cursor: pointer;
     border-left: 4px solid transparent;
+    display: flex;             /* 👈 新增：橫向排列 */
+    justify-content: space-between; /* 👈 新增：左右分散 */
+    align-items: center;       /* 👈 新增：垂直居中 */
+}
+/* 新增：左側歌名區塊 */
+.song-info {
+    flex-grow: 1;
+    text-align: left;
 }
 
+/* 新增：右側移動按鈕外框 */
+.reorder-btns {
+    display: flex;
+    gap: 8px;
+}
+
+/* 新增：上移/下移按鈕樣式 */
+.reorder-btn {
+    background-color: #2a2a2a;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
 .item-row:hover {
     background-color: #282828;
     border-left: 4px solid #1db954;
 }
-
+/* 新增：隨機播放按鈕啟用時的綠色高亮 */
+#shuffle-btn.active {
+    color: #1db954 !important;
+    font-weight: bold;
+}
+/* 新增：滑鼠移到上移/下移按鈕時，讓按鈕變亮 */
+.reorder-btn:hover {
+    background-color: #3e3e3e;
+    color: #fff;
+}
 .back-btn {
     background: none;
     border: none;
