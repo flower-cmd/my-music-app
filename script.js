@@ -2,27 +2,27 @@ const audio = document.getElementById('audio');
 const playBtn = document.getElementById('play');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
-const shuffleBtn = document.getElementById('shuffle-btn'); // 👈 新增隨機按鈕
+const shuffleBtn = document.getElementById('shuffle-btn');
 const title = document.getElementById('title');
 const artist = document.getElementById('artist');
 const progress = document.getElementById('progress');
 const progressContainer = document.getElementById('progress-container');
 
-let allSongs = [];           // 儲存總歌單
-let currentPlaylist = [];       // 當前播放模式中的歌曲清單
+let allSongs = [];           
+let currentPlaylist = [];       
 let songIndex = 0;
 let isPlaying = false;
-let isLocalMode = false;       // 判斷是否為電腦本機執行
+let isLocalMode = false;       
 
-// 隨機播放與歌單移動所需的變數
-let isShuffle = false;         // 👈 紀錄隨機播放是否開啟
-let currentPlaylistType = 'all'; // 👈 紀錄目前看的是 'all' 還是 'custom'
-let currentPlaylistName = '';   // 👈 紀錄目前打開的自訂歌單名稱 (例如 '中文')
+let isShuffle = false;         
+let currentPlaylistType = 'all'; 
+let currentPlaylistName = '';   
 
 async function init() {
     await checkEnvironment();
     await loadAllSongs();
     setupAudioEvents();
+    renderMemo(); // 👈 初始化載入備忘錄
 }
 
 // 1. 自動判斷環境
@@ -55,12 +55,14 @@ async function loadAllSongs() {
 }
 
 // 3. 底部主要分頁切換
-function switchTab(tabId) {
+function switchTab(tabId, btnElement) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     
     document.getElementById(tabId).classList.add('active');
-    event.target.classList.add('active');
+    if (btnElement) {
+        btnElement.classList.add('active');
+    }
     
     if(tabId === 'playlist-tab') {
         renderPlaylistCheckboxes();
@@ -73,8 +75,8 @@ function showSongList(type, playlistName = '') {
     document.getElementById('playlist-selector-view').classList.add('hidden');
     document.getElementById('song-list-view').classList.remove('hidden');
     
-    currentPlaylistType = type;       // 👈 紀錄當前類型
-    currentPlaylistName = playlistName; // 👈 紀錄歌單名稱
+    currentPlaylistType = type;       
+    currentPlaylistName = playlistName; 
     
     const container = document.getElementById('songs-container');
     container.innerHTML = '';
@@ -88,7 +90,6 @@ function showSongList(type, playlistName = '') {
         const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
         const allowedSrcs = playlists[playlistName] || [];
         
-        // 👈 核心修改：依照使用者儲存的順序來排列歌曲
         currentPlaylist = [];
         allowedSrcs.forEach(src => {
             const foundSong = allSongs.find(s => s.src === src);
@@ -110,37 +111,33 @@ function renderSongs(container) {
         const div = document.createElement('div');
         div.className = 'item-row';
         
-        // 左側歌曲資訊 (點擊這裡才播放)
         const infoDiv = document.createElement('div');
         infoDiv.className = 'song-info';
         infoDiv.innerHTML = `<strong>${song.title}</strong><br><span style="color:#aaa; font-size:14px;">${song.artist}</span>`;
         infoDiv.onclick = () => startPlayer(index);
         div.appendChild(infoDiv);
 
-        // 👈 新增：如果是在自訂歌單，右側顯示「上移 / 下移」按鈕
         if (currentPlaylistType === 'custom') {
             const btnDiv = document.createElement('div');
             btnDiv.className = 'reorder-btns';
             
-            // 上移按鈕 (第一首歌不顯示)
             if (index > 0) {
                 const upBtn = document.createElement('button');
                 upBtn.className = 'reorder-btn';
                 upBtn.innerText = '▲';
                 upBtn.onclick = (e) => {
-                    e.stopPropagation(); // 👈 防止觸發播放音樂
+                    e.stopPropagation(); 
                     moveSong(index, -1);
                 };
                 btnDiv.appendChild(upBtn);
             }
 
-            // 下移按鈕 (最後一首歌不顯示)
             if (index < currentPlaylist.length - 1) {
                 const downBtn = document.createElement('button');
                 downBtn.className = 'reorder-btn';
                 downBtn.innerText = '▼';
                 downBtn.onclick = (e) => {
-                    e.stopPropagation(); // 👈 防止觸發播放音樂
+                    e.stopPropagation(); 
                     moveSong(index, 1);
                 };
                 btnDiv.appendChild(downBtn);
@@ -152,24 +149,20 @@ function renderSongs(container) {
     });
 }
 
-// 👈 新增：移動歌曲位置與存檔邏輯
 function moveSong(index, direction) {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= currentPlaylist.length) return;
 
-    // 1. 在記憶體陣列中交換兩首歌的位置
     const temp = currentPlaylist[index];
     currentPlaylist[index] = currentPlaylist[targetIndex];
     currentPlaylist[targetIndex] = temp;
 
-    // 2. 如果是自訂歌單，將新順序更新存入 LocalStorage
     if (currentPlaylistType === 'custom' && currentPlaylistName) {
         const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
         playlists[currentPlaylistName] = currentPlaylist.map(song => song.src);
         localStorage.setItem('myPlaylists', JSON.stringify(playlists));
     }
 
-    // 3. 重新渲染畫面清單
     const container = document.getElementById('songs-container');
     container.innerHTML = '';
     renderSongs(container);
@@ -230,12 +223,10 @@ function pauseSong() { isPlaying = false; playBtn.innerText = '▶ 播放'; audi
 
 playBtn.addEventListener('click', () => { if (isPlaying) { pauseSong(); } else { playSong(); } });
 
-// 👈 核心修改：下一首邏輯（支援隨機播放）
 function nextSong() {
     if (currentPlaylist.length === 0) return;
 
     if (isShuffle) {
-        // 如果開啟隨機播放，且歌單大於 1 首歌，就選一首非當前的隨機歌曲
         if (currentPlaylist.length > 1) {
             let newIndex = songIndex;
             while (newIndex === songIndex) {
@@ -246,14 +237,12 @@ function nextSong() {
             songIndex = 0;
         }
     } else {
-        // 順序播放下一首
         songIndex = (songIndex + 1) % currentPlaylist.length;
     }
     loadSong(currentPlaylist[songIndex]);
     playSong();
 }
 
-// 👈 核心修改：上一首邏輯（支援隨機播放）
 function prevSong() {
     if (currentPlaylist.length === 0) return;
 
@@ -268,7 +257,6 @@ function prevSong() {
             songIndex = 0;
         }
     } else {
-        // 順序播放上一首
         songIndex = (songIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
     }
     loadSong(currentPlaylist[songIndex]);
@@ -278,7 +266,6 @@ function prevSong() {
 nextBtn.addEventListener('click', nextSong);
 prevBtn.addEventListener('click', prevSong);
 
-// 👈 新增：綁定隨機播放按鈕點擊事件
 shuffleBtn.addEventListener('click', () => {
     isShuffle = !isShuffle;
     if (isShuffle) {
@@ -293,10 +280,10 @@ shuffleBtn.addEventListener('click', () => {
 function setupAudioEvents() {
     audio.addEventListener('timeupdate', () => { if (audio.duration) progress.style.width = `${(audio.currentTime / audio.duration) * 100}%`; });
     progressContainer.addEventListener('click', (e) => { if (audio.duration) audio.currentTime = (e.offsetX / progressContainer.clientWidth) * audio.duration; });
-    audio.addEventListener('ended', nextSong); // 歌曲播完會自動觸發 nextSong
+    audio.addEventListener('ended', nextSong); 
 }
 
-// 7. 電腦端 API 功能
+// 7. 電腦端 API 功能：線上下載 YouTube 音樂 (單首)
 async function downloadYouTubeSong() {
     const url = document.getElementById('yt-url').value;
     const titleVal = document.getElementById('song-title').value;
@@ -305,7 +292,7 @@ async function downloadYouTubeSong() {
     const status = document.getElementById('add-status');
 
     if(!url || !titleVal || !artistVal || !filename) { status.innerText = "❌ 請填寫所有欄位！"; return; }
-    status.style.color = "#1db954"; status.innerText = "⏳ 正在線上下載並轉檔中，請稍候...";
+    status.style.color = "#ff9800"; status.innerText = "⏳ 正在線上下載並轉檔中，請稍候...";
 
     try {
         const res = await fetch('/api/add_song', {
@@ -315,6 +302,7 @@ async function downloadYouTubeSong() {
         });
         const data = await res.json();
         if(res.ok) {
+            status.style.color = "#1db954";
             status.innerText = `✅ ${data.message}`;
             await loadAllSongs();
             document.getElementById('yt-url').value = ''; document.getElementById('song-title').value = ''; document.getElementById('song-artist').value = ''; document.getElementById('song-filename').value = '';
@@ -322,6 +310,46 @@ async function downloadYouTubeSong() {
             status.innerText = `❌ 錯誤: ${data.message}`;
         }
     } catch (e) { status.innerText = "❌ 無法連線到本地 Python 後台"; }
+}
+
+// 8. 電腦端 API 功能：批次下載所有歌曲
+async function batchDownloadSongs() {
+    const batchInput = document.getElementById('batch-input').value;
+    const status = document.getElementById('add-status');
+    
+    if (!batchInput) {
+        status.innerText = "❌ 請貼上備忘錄資料！";
+        return;
+    }
+    
+    try {
+        const songsToDownload = JSON.parse(batchInput);
+        if (!Array.isArray(songsToDownload)) {
+            status.innerText = "❌ 資料格式錯誤，必須是從手機複製的備忘錄格式！";
+            return;
+        }
+        
+        status.style.color = "#ff9800";
+        status.innerText = `⏳ 正在批次下載 ${songsToDownload.length} 首歌曲，這需要一些時間，請稍候...`;
+        
+        const res = await fetch('/api/batch_add_songs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ songs: songsToDownload })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            status.style.color = "#1db954";
+            status.innerText = `✅ ${data.message}`;
+            document.getElementById('batch-input').value = '';
+            await loadAllSongs();
+        } else {
+            status.innerText = `❌ 錯誤: ${data.message}`;
+        }
+    } catch (e) {
+        status.innerText = "❌ 解析失敗！請確認貼上的資料是否完整。";
+    }
 }
 
 function renderPlaylistCheckboxes() {
@@ -354,6 +382,78 @@ async function createPlaylist() {
     status.innerText = `✅ 歌單【${name}】已儲存到此裝置！`;
     document.getElementById('new-playlist-name').value = '';
     checkboxes.forEach(cb => cb.checked = false);
+}
+
+// 9. 📝 備忘錄專用核心邏輯 (手機端/電腦端皆可執行)
+function renderMemo() {
+    const container = document.getElementById('memo-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    const memoList = JSON.parse(localStorage.getItem('myMemo') || '[]');
+    if (memoList.length === 0) {
+        container.innerHTML = '<p style="color:#aaa; text-align:center; font-size:14px; margin-top:15px;">目前備忘錄空空如也</p>';
+        return;
+    }
+    
+    memoList.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.style.cursor = 'default';
+        div.innerHTML = `
+            <div class="song-info">
+                <strong>${item.title}</strong> - <span style="color:#aaa;">${item.artist}</span><br>
+                <span style="font-size:11px; color:#666; word-break:break-all;">${item.url}</span>
+            </div>
+            <button onclick="deleteMemoItem(${index})" style="background:#e0e0e0; border:none; color:#333; padding:5px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">❌</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function addToMemo() {
+    const url = document.getElementById('memo-url').value;
+    const titleVal = document.getElementById('memo-title').value;
+    const artistVal = document.getElementById('memo-artist').value;
+    const filename = document.getElementById('memo-filename').value;
+    
+    if(!url || !titleVal || !artistVal || !filename) {
+        alert("請填寫所有欄位！");
+        return;
+    }
+    
+    const memoList = JSON.parse(localStorage.getItem('myMemo') || '[]');
+    memoList.push({ url, title: titleVal, artist: artistVal, filename });
+    localStorage.setItem('myMemo', JSON.stringify(memoList));
+    
+    // 清空輸入
+    document.getElementById('memo-url').value = '';
+    document.getElementById('memo-title').value = '';
+    document.getElementById('memo-artist').value = '';
+    document.getElementById('memo-filename').value = '';
+    
+    renderMemo();
+}
+
+function deleteMemoItem(index) {
+    const memoList = JSON.parse(localStorage.getItem('myMemo') || '[]');
+    memoList.splice(index, 1);
+    localStorage.setItem('myMemo', JSON.stringify(memoList));
+    renderMemo();
+}
+
+function copyMemoData() {
+    const memoList = localStorage.getItem('myMemo') || '[]';
+    if (memoList === '[]') {
+        alert("備忘錄裡沒有資料可以複製喔！");
+        return;
+    }
+    
+    navigator.clipboard.writeText(memoList).then(() => {
+        alert("📋 備忘錄資料已成功複製到剪貼簿！\n請將這段文字傳到電腦貼上。");
+    }).catch(err => {
+        alert("複製失敗，請手動選取複製。");
+    });
 }
 
 init();

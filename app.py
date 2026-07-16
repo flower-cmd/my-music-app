@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 
-# 建立網頁伺服器，並將靜態檔案根目錄設在當前資料夾
 app = Flask(__name__, static_folder='.')
 
 @app.route('/')
@@ -14,12 +13,11 @@ def index():
 def serve_static(path):
     return send_from_directory('.', path)
 
-# 讓前端網頁辨識目前是「電腦本地執行」還是「手機雲端執行」
 @app.route('/api/is_local', methods=['GET'])
 def is_local():
     return jsonify({"local": True})
 
-# 處理前端網頁傳過來的 YouTube 下載請求
+# 1. 單首下載
 @app.route('/api/add_song', methods=['POST'])
 def add_song():
     data = request.json
@@ -32,11 +30,9 @@ def add_song():
     output_path = os.path.join("songs", mp3_name)
     
     try:
-        # 呼叫 yt-dlp 進行下載與轉檔
         cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "128K", "-o", output_path, url]
         subprocess.run(cmd, check=True)
         
-        # 自動更新 songs.json
         json_path = "songs.json"
         playlist = []
         if os.path.exists(json_path):
@@ -51,7 +47,57 @@ def add_song():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# 處理前端網頁建立歌單的請求
+# 2. 新增：批次下載
+@app.route('/api/batch_add_songs', methods=['POST'])
+def batch_add_songs():
+    data = request.json
+    songs_to_download = data.get('songs', [])
+    
+    success_count = 0
+    failed_songs = []
+    
+    # 讀取舊歌單
+    json_path = "songs.json"
+    playlist = []
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            playlist = json.load(f)
+            
+    print(f"\n⚡ 啟動批次下載任務，共 {len(songs_to_download)} 首歌曲...")
+            
+    for index, song in enumerate(songs_to_download, 1):
+        url = song.get('url')
+        title = song.get('title')
+        artist = song.get('artist')
+        filename = song.get('filename')
+        
+        mp3_name = f"{filename}.mp3"
+        output_path = os.path.join("songs", mp3_name)
+        
+        print(f"[{index}/{len(songs_to_download)}] 正在下載《{title}》...")
+        
+        try:
+            cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "128K", "-o", output_path, url]
+            subprocess.run(cmd, check=True)
+            
+            # 沒報錯代表下載成功，加入暫時陣列
+            playlist.append({"title": title, "artist": artist, "src": f"songs/{mp3_name}"})
+            success_count += 1
+            print(f"➜ 成功下載《{title}》！")
+        except Exception as e:
+            failed_songs.append(title)
+            print(f"➜ 失敗《{title}》！原因: {e}")
+            
+    # 批次結束後一次寫入 songs.json 檔案
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(playlist, f, ensure_ascii=False, indent=2)
+        
+    return jsonify({
+        "status": "success",
+        "message": f"批次下載完成！成功下載 {success_count} 首，失敗 {len(failed_songs)} 首。",
+        "failed": failed_songs
+    })
+
 @app.route('/api/save_playlist', methods=['POST'])
 def save_playlist():
     data = request.json
