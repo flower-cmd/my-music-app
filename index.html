@@ -2,56 +2,109 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#121212">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#141526">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="我的私人音樂盒 PRO">
     <title>我的私人音樂盒 PRO</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <!-- 背景環境柔光裝飾 -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+
     <!-- 頂部主容器 -->
     <div class="main-container">
+
+        <!-- 頂部氛圍標題列 -->
+        <header class="app-header">
+            <div class="brand-badge">🌙 LO-FI COZY NIGHT</div>
+            <h1 class="app-title">私人音樂盒</h1>
+            <p class="app-subtitle">放慢步調，享受屬於你的靜謐音樂時光</p>
+        </header>
         
         <!-- ================= 1. 聽歌分頁 ================= -->
         <div id="listen-tab" class="tab-content active">
             <!-- 聽歌首頁子選單 -->
             <div id="listen-menu" class="sub-menu">
-                <button class="menu-btn" onclick="showSongList('all')">🌐 所有歌曲</button>
-                <button class="menu-btn" onclick="showPlaylistList()">🗂️ 分類歌單</button>
+                <button class="menu-btn" onclick="showSongList('all')">
+                    <span class="menu-icon">🌌</span>
+                    <div class="menu-text">
+                        <strong>所有歌曲</strong>
+                        <span>瀏覽並播放收藏庫中的所有音樂</span>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </button>
+                <button class="menu-btn" onclick="showPlaylistList()">
+                    <span class="menu-icon">🕯️</span>
+                    <div class="menu-text">
+                        <strong>分類歌單</strong>
+                        <span>依照心情與情境挑選專屬歌單</span>
+                    </div>
+                    <span class="menu-arrow">›</span>
+                </button>
             </div>
 
             <!-- 分類歌單選取區 -->
             <div id="playlist-selector-view" class="list-view hidden">
-                <button class="back-btn" onclick="backToListenMenu()">⬅️ 返回主選單</button>
-                <h3>選擇歌單</h3>
+                <button class="back-btn" onclick="backToListenMenu()">‹ 返回主選單</button>
+                <h3 class="section-title">選擇歌單</h3>
                 <div id="playlist-names-container"></div>
             </div>
 
             <!-- 歌曲清單顯示區 -->
             <div id="song-list-view" class="list-view hidden">
-                <button class="back-btn" onclick="backToListenMenu()">⬅️ 返回主選單</button>
-                <h3 id="list-title">歌曲列表</h3>
+                <button class="back-btn" onclick="backToListenMenu()">‹ 返回主選單</button>
+                <h3 id="list-title" class="section-title">歌曲列表</h3>
                 <div id="songs-container"></div>
             </div>
 
             <!-- 核心播放器面板 -->
             <div id="player-view" class="player-container hidden">
-                <button class="back-btn" onclick="backToSongList()">⬅️ 返回歌曲清單</button>
-                <h2 id="title">歌曲載入中...</h2>
-                <p id="artist">歌手名稱</p>
-                <audio id="audio" playsinline></audio>
-                <div class="progress-container" id="progress-container">
-                    <div class="progress" id="progress"></div>
+                <div class="player-top-bar">
+                    <button class="back-btn player-back" onclick="backToSongList()">‹ 返回清單</button>
+                    <span class="now-playing-pill">NOW PLAYING</span>
                 </div>
+
+                <!-- 靜謐夜晚氛圍視覺卡片 -->
+                <div class="cover-art-box">
+                    <div class="cover-inner-glow"></div>
+                    <span class="cover-icon">🎧</span>
+                </div>
+
+                <div id="song-meta" class="song-meta">
+                    <h2 id="title">歌曲載入中...</h2>
+                    <p id="artist">歌手名稱</p>
+                </div>
+
+                <audio id="audio" playsinline></audio>
+
+                <div class="progress-section">
+                    <div class="progress-container" id="progress-container">
+                        <div class="progress" id="progress">
+                            <span class="progress-thumb"></span>
+                        </div>
+                    </div>
+                    <div class="time-info">
+                        <span id="current-time">0:00</span>
+                        <span id="duration">0:00</span>
+                    </div>
+                </div>
+
                 <div class="controls">
-                    <button id="prev">⏮ 上一首</button>
-                    <button id="play">▶ 播放</button>
-                    <button id="next">⏭ 下一首</button>
-                    <button id="shuffle-btn">🔀 隨機：關</button>
+                    <button id="shuffle-btn" class="ctrl-secondary" title="隨機播放">🔀 隨機：關</button>
+                    <div class="main-controls">
+                        <button id="prev" class="ctrl-icon" aria-label="上一首">⏮</button>
+                        <button id="play" class="ctrl-play" aria-label="播放或暫停">▶ 播放</button>
+                        <button id="next" class="ctrl-icon" aria-label="下一首">⏭</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -59,7 +112,7 @@
         <!-- ================= 2. 新增歌曲分頁 (電腦端專用) ================= -->
         <div id="add-tab" class="tab-content">
             <div class="card">
-                <h3>📥 從 YouTube 下載新歌曲</h3>
+                <h3 class="card-title">📥 從 YouTube 下載新歌曲</h3>
                 <div id="local-add-form" class="form-group">
                     <input type="text" id="yt-url" placeholder="請貼上 YouTube 網址">
                     <input type="text" id="song-title" placeholder="歌曲名稱 (例如: 青花瓷)">
@@ -67,11 +120,11 @@
                     <input type="text" id="song-filename" placeholder="英文副檔名 (例如: qingtian)">
                     <button class="action-btn" onclick="downloadYouTubeSong()">開始單首下載轉檔</button>
                     
-                    <hr style="border: 1px solid #333; margin: 25px 0;">
+                    <hr class="divider">
                     
-                    <h3>⚡ 批次下載 (貼上手機複製的備忘錄)</h3>
-                    <textarea id="batch-input" placeholder="請在此貼上從手機複製的一整串備忘錄資料..." style="width: 100%; height: 100px; background: #282828; color: white; border: 1px solid #444; border-radius: 8px; padding: 10px; box-sizing: border-box; font-family: sans-serif; resize: none; margin-bottom: 10px;"></textarea>
-                    <button class="action-btn" onclick="batchDownloadSongs()" style="background-color: #ff9800;">開始批次下載所有歌曲</button>
+                    <h3 class="card-title">⚡ 批次下載 (貼上手機複製的備忘錄)</h3>
+                    <textarea id="batch-input" class="styled-textarea" placeholder="請在此貼上從手機複製的一整串備忘錄資料..."></textarea>
+                    <button class="action-btn secondary-action" onclick="batchDownloadSongs()">開始批次下載所有歌曲</button>
                     
                     <p id="add-status" class="status-msg"></p>
                 </div>
@@ -84,11 +137,11 @@
         <!-- ================= 3. 建立歌單分頁 ================= -->
         <div id="playlist-tab" class="tab-content">
             <div class="card">
-                <h3>📂 建立新分類歌單</h3>
+                <h3 class="card-title">📂 建立新分類歌單</h3>
                 <div id="local-playlist-form">
-                    <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 抖音歌、休閒聽)">
-                    <h4>勾選要歸類進去的歌曲：</h4>
-                    <div id="playlist-songs-checkboxes"></div>
+                    <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 深夜放鬆、午後咖啡)">
+                    <h4 class="sub-heading">勾選要歸類進去的歌曲：</h4>
+                    <div id="playlist-songs-checkboxes" class="checkbox-list"></div>
                     <button class="action-btn" onclick="createPlaylist()">確認儲存歌單</button>
                     <p id="playlist-status" class="status-msg"></p>
                 </div>
@@ -101,21 +154,21 @@
         <!-- ================= 4. 📝 備忘錄分頁 (手機、電腦通用) ================= -->
         <div id="memo-tab" class="tab-content">
             <div class="card">
-                <h3>📝 待下載歌曲備忘錄</h3>
-                <p style="font-size: 13px; color: #aaa; line-height: 1.4; margin-bottom: 15px;">
-                    在手機上滑到想聽的歌？先存進這裡。等回到電腦前，點擊下方「複製全部」，傳到電腦貼上就能一鍵批次下載！
+                <h3 class="card-title">📝 待下載歌曲備忘錄</h3>
+                <p class="helper-text">
+                    在手機上滑到想聽的歌？先存進這裡。等回到電腦前，點擊下方「一鍵複製資料」，傳到電腦貼上就能批次下載！
                 </p>
                 <input type="text" id="memo-url" placeholder="請貼上 YouTube 網址">
                 <input type="text" id="memo-title" placeholder="歌曲名稱">
                 <input type="text" id="memo-artist" placeholder="歌手名稱">
                 <input type="text" id="memo-filename" placeholder="英文副檔名 (例如: zuijin)">
-                <button class="action-btn" onclick="addToMemo()" style="background-color: #ff9800; border: none; margin-top: 5px;">💾 存入備忘錄</button>
+                <button class="action-btn" onclick="addToMemo()">💾 存入備忘錄</button>
                 
-                <hr style="border: 1px solid #333; margin: 25px 0;">
+                <hr class="divider">
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0;">📋 待下載清單</h4>
-                    <button onclick="copyMemoData()" style="background: #1db954; border: none; color: white; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold;">一鍵複製資料</button>
+                <div class="memo-header-row">
+                    <h4 class="sub-heading" style="margin: 0;">📋 待下載清單</h4>
+                    <button class="copy-pill-btn" onclick="copyMemoData()">一鍵複製資料</button>
                 </div>
                 <div id="memo-list-container"></div>
             </div>
@@ -123,12 +176,24 @@
 
     </div>
 
-    <!-- 底部固定導覽列 -->
+    <!-- 底部懸浮膠囊毛玻璃導覽列 -->
     <nav class="navbar">
-        <button class="nav-btn active" onclick="switchTab('listen-tab', this)">🎵 聽歌</button>
-        <button class="nav-btn" onclick="switchTab('add-tab', this)">📥 新增</button>
-        <button class="nav-btn" onclick="switchTab('playlist-tab', this)">📂 歌單</button>
-        <button class="nav-btn" onclick="switchTab('memo-tab', this)">📝 備忘錄</button>
+        <button class="nav-btn active" onclick="switchTab('listen-tab', this)">
+            <span class="nav-icon">🎵</span>
+            <span class="nav-label">聽歌</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('add-tab', this)">
+            <span class="nav-icon">📥</span>
+            <span class="nav-label">新增</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('playlist-tab', this)">
+            <span class="nav-icon">📂</span>
+            <span class="nav-label">歌單</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('memo-tab', this)">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">備忘錄</span>
+        </button>
     </nav>
 
     <script src="script.js"></script>

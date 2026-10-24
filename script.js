@@ -5,8 +5,11 @@ const nextBtn = document.getElementById('next');
 const shuffleBtn = document.getElementById('shuffle-btn');
 const title = document.getElementById('title');
 const artist = document.getElementById('artist');
+const songMeta = document.getElementById('song-meta');
 const progress = document.getElementById('progress');
 const progressContainer = document.getElementById('progress-container');
+const currentTimeEl = document.getElementById('current-time');
+const durationEl = document.getElementById('duration');
 
 let allSongs = [];           
 let currentPlaylist = [];       
@@ -17,6 +20,7 @@ let isLocalMode = false;
 let isShuffle = false;         
 let currentPlaylistType = 'all'; 
 let currentPlaylistName = '';   
+let isDraggingProgress = false;
 
 async function init() {
     await checkEnvironment();
@@ -24,6 +28,14 @@ async function init() {
     setupAudioEvents();
     setupMediaSessionHandlers();
     renderMemo(); // 👈 初始化載入備忘錄
+}
+
+// 格式化秒數為 m:ss
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
 // 1. 自動判斷環境
@@ -83,11 +95,11 @@ function showSongList(type, playlistName = '') {
     container.innerHTML = '';
     
     if (type === 'all') {
-        document.getElementById('list-title').innerText = "🌐 所有歌曲";
+        document.getElementById('list-title').innerText = "🌌 所有歌曲";
         currentPlaylist = [...allSongs];
         renderSongs(container);
     } else if (type === 'custom') {
-        document.getElementById('list-title').innerText = `🗂️ 歌單：${playlistName}`;
+        document.getElementById('list-title').innerText = `🕯️ 歌單：${playlistName}`;
         const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
         const allowedSrcs = playlists[playlistName] || [];
         
@@ -104,7 +116,7 @@ function showSongList(type, playlistName = '') {
 // 5. 渲染歌曲清單 (加上移動按鈕)
 function renderSongs(container) {
     if(currentPlaylist.length === 0) {
-        container.innerHTML = '<p style="color:#aaa; text-align:center;">此歌單內還沒有歌曲</p>';
+        container.innerHTML = '<p style="color:#9fa4c4; text-align:center; padding: 20px 0;">此歌單內還沒有歌曲</p>';
         return;
     }
     
@@ -114,7 +126,7 @@ function renderSongs(container) {
         
         const infoDiv = document.createElement('div');
         infoDiv.className = 'song-info';
-        infoDiv.innerHTML = `<strong>${song.title}</strong><br><span style="color:#aaa; font-size:14px;">${song.artist}</span>`;
+        infoDiv.innerHTML = `<strong>${song.title}</strong><span class="song-artist-sub">${song.artist}</span>`;
         infoDiv.onclick = () => startPlayer(index);
         div.appendChild(infoDiv);
 
@@ -180,14 +192,20 @@ async function showPlaylistList() {
     const names = Object.keys(playlists);
     
     if(names.length === 0) {
-        container.innerHTML = '<p style="color:#aaa; text-align:center;">目前還沒有建立任何分類歌單</p>';
+        container.innerHTML = '<p style="color:#9fa4c4; text-align:center; padding: 20px 0;">目前還沒有建立任何分類歌單</p>';
         return;
     }
     
     names.forEach(name => {
         const div = document.createElement('div');
         div.className = 'item-row';
-        div.innerText = `📁 ${name} (${playlists[name].length} 首)`;
+        div.innerHTML = `
+            <div class="song-info">
+                <strong>🕯️ ${name}</strong>
+                <span class="song-artist-sub">共 ${playlists[name].length} 首歌曲</span>
+            </div>
+            <span style="color:#9fa4c4; font-size:20px;">›</span>
+        `;
         div.onclick = () => showSongList('custom', name);
         container.appendChild(div);
     });
@@ -214,9 +232,17 @@ function startPlayer(index) {
 }
 
 function loadSong(song) {
+    if (songMeta) {
+        songMeta.classList.remove('fade-song');
+        void songMeta.offsetWidth; // 觸發重繪以重新播放淡入動畫
+        songMeta.classList.add('fade-song');
+    }
     title.innerText = song.title;
     artist.innerText = song.artist;
     audio.src = song.src;
+    progress.style.width = '0%';
+    if (currentTimeEl) currentTimeEl.innerText = '0:00';
+    if (durationEl) durationEl.innerText = '0:00';
     updateMediaSession(song);
 }
 
@@ -326,9 +352,53 @@ shuffleBtn.addEventListener('click', () => {
     }
 });
 
+function seekByClientX(clientX) {
+    if (!audio.duration) return;
+    const rect = progressContainer.getBoundingClientRect();
+    const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    audio.currentTime = ratio * audio.duration;
+    progress.style.width = `${ratio * 100}%`;
+    if (currentTimeEl) currentTimeEl.innerText = formatTime(audio.currentTime);
+}
+
 function setupAudioEvents() {
-    audio.addEventListener('timeupdate', () => { if (audio.duration) progress.style.width = `${(audio.currentTime / audio.duration) * 100}%`; });
-    progressContainer.addEventListener('click', (e) => { if (audio.duration) audio.currentTime = (e.offsetX / progressContainer.clientWidth) * audio.duration; });
+    audio.addEventListener('loadedmetadata', () => {
+        if (durationEl) durationEl.innerText = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+        if (!isDraggingProgress && audio.duration) {
+            progress.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+            if (currentTimeEl) currentTimeEl.innerText = formatTime(audio.currentTime);
+            if (durationEl && durationEl.innerText === '0:00') {
+                durationEl.innerText = formatTime(audio.duration);
+            }
+        }
+    });
+
+    // 支援點擊與滑動拖曳進度條 (滑鼠 + 手機觸控)
+    progressContainer.addEventListener('mousedown', (e) => {
+        isDraggingProgress = true;
+        seekByClientX(e.clientX);
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (isDraggingProgress) seekByClientX(e.clientX);
+    });
+    window.addEventListener('mouseup', () => {
+        isDraggingProgress = false;
+    });
+
+    progressContainer.addEventListener('touchstart', (e) => {
+        isDraggingProgress = true;
+        if (e.touches.length > 0) seekByClientX(e.touches[0].clientX);
+    }, { passive: true });
+    progressContainer.addEventListener('touchmove', (e) => {
+        if (isDraggingProgress && e.touches.length > 0) seekByClientX(e.touches[0].clientX);
+    }, { passive: true });
+    progressContainer.addEventListener('touchend', () => {
+        isDraggingProgress = false;
+    });
+
     audio.addEventListener('ended', nextSong); 
 }
 
@@ -341,7 +411,7 @@ async function downloadYouTubeSong() {
     const status = document.getElementById('add-status');
 
     if(!url || !titleVal || !artistVal || !filename) { status.innerText = "❌ 請填寫所有欄位！"; return; }
-    status.style.color = "#ff9800"; status.innerText = "⏳ 正在線上下載並轉檔中，請稍候...";
+    status.style.color = "#f4a261"; status.innerText = "⏳ 正在線上下載並轉檔中，請稍候...";
 
     try {
         const res = await fetch('/api/add_song', {
@@ -351,7 +421,7 @@ async function downloadYouTubeSong() {
         });
         const data = await res.json();
         if(res.ok) {
-            status.style.color = "#1db954";
+            status.style.color = "#f4a261";
             status.innerText = `✅ ${data.message}`;
             await loadAllSongs();
             document.getElementById('yt-url').value = ''; document.getElementById('song-title').value = ''; document.getElementById('song-artist').value = ''; document.getElementById('song-filename').value = '';
@@ -378,7 +448,7 @@ async function batchDownloadSongs() {
             return;
         }
         
-        status.style.color = "#ff9800";
+        status.style.color = "#f4a261";
         status.innerText = `⏳ 正在批次下載 ${songsToDownload.length} 首歌曲，這需要一些時間，請稍候...`;
         
         const res = await fetch('/api/batch_add_songs', {
@@ -389,7 +459,7 @@ async function batchDownloadSongs() {
         
         const data = await res.json();
         if (res.ok) {
-            status.style.color = "#1db954";
+            status.style.color = "#f4a261";
             status.innerText = `✅ ${data.message}`;
             document.getElementById('batch-input').value = '';
             await loadAllSongs();
@@ -441,7 +511,7 @@ function renderMemo() {
     
     const memoList = JSON.parse(localStorage.getItem('myMemo') || '[]');
     if (memoList.length === 0) {
-        container.innerHTML = '<p style="color:#aaa; text-align:center; font-size:14px; margin-top:15px;">目前備忘錄空空如也</p>';
+        container.innerHTML = '<p style="color:#9fa4c4; text-align:center; font-size:13.5px; margin-top:15px;">目前備忘錄空空如也</p>';
         return;
     }
     
@@ -451,10 +521,10 @@ function renderMemo() {
         div.style.cursor = 'default';
         div.innerHTML = `
             <div class="song-info">
-                <strong>${item.title}</strong> - <span style="color:#aaa;">${item.artist}</span><br>
-                <span style="font-size:11px; color:#666; word-break:break-all;">${item.url}</span>
+                <strong>${item.title} <span style="font-weight:400; color:#9fa4c4;">- ${item.artist}</span></strong>
+                <span style="font-size:11.5px; color:#6e7396; word-break:break-all;">${item.url}</span>
             </div>
-            <button onclick="deleteMemoItem(${index})" style="background:#e0e0e0; border:none; color:#333; padding:5px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">❌</button>
+            <button class="memo-delete-btn" onclick="deleteMemoItem(${index})" title="刪除">✕</button>
         `;
         container.appendChild(div);
     });
