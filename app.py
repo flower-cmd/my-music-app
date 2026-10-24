@@ -4,6 +4,7 @@ import os
 import subprocess
 
 app = Flask(__name__, static_folder='.')
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 @app.route('/')
 def index():
