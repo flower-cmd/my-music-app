@@ -7,6 +7,7 @@ const title = document.getElementById('title');
 const artist = document.getElementById('artist');
 const songMeta = document.getElementById('song-meta');
 const playerCover = document.getElementById('player-cover');
+const playerView = document.getElementById('player-view');
 const progress = document.getElementById('progress');
 const progressContainer = document.getElementById('progress-container');
 const currentTimeEl = document.getElementById('current-time');
@@ -23,8 +24,10 @@ let isShuffle = false;
 let currentPlaylistType = 'all'; 
 let currentPlaylistName = '';   
 let isDraggingProgress = false;
+let isReorderMode = false;
+let draggedSongIndex = null;
 
-// 豐富的卡片漸層色盤與圖示（讓每首歌與歌單都有獨特的漸層封面）
+// 豐富的卡片漸層色盤與圖示
 const COVER_GRADIENTS = [
     'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
     'linear-gradient(135deg, #0d9488 0%, #0284c7 50%, #4f46e5 100%)',
@@ -73,10 +76,11 @@ function getSongStats() {
 }
 
 function recordSongPlay(song) {
-    if (!song || !song.src) return;
+    const key = song && (song.idbKey || song.src);
+    if (!key) return;
     const stats = getSongStats();
-    const prev = stats[song.src] || { count: 0, lastPlayed: 0 };
-    stats[song.src] = {
+    const prev = stats[key] || { count: 0, lastPlayed: 0 };
+    stats[key] = {
         count: (prev.count || 0) + 1,
         lastPlayed: Date.now()
     };
@@ -95,7 +99,110 @@ function formatLastPlayed(timestamp, count) {
     return `${diffDays} 天前`;
 }
 
-// 1. 自動判斷環境：只有在電腦開啟本地後台時，才顯示「📥 新增歌曲」按鈕；手機外出時自動隱藏，不顯示多餘提示框！
+// ================= IndexedDB 手機本機免 Python 音樂庫 =================
+function openMusicDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('MyMusicBoxDB', 1);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('localSongs')) {
+                db.createObjectStore('localSongs', { keyPath: 'id' });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function getAllIndexedDBSongs() {
+    try {
+        const db = await openMusicDB();
+        return new Promise((resolve) => {
+            const tx = db.transaction('localSongs', 'readonly');
+            const store = tx.objectStore('localSongs');
+            const req = store.getAll();
+            req.onsuccess = () => {
+                const items = req.result || [];
+                const converted = items.map(item => {
+                    const blobUrl = URL.createObjectURL(item.blob);
+                    return {
+                        title: item.title,
+                        artist: item.artist,
+                        src: blobUrl,
+                        idbKey: `idb:${item.id}`,
+                        isLocalImport: true
+                    };
+                });
+                resolve(converted);
+            };
+            req.onerror = () => resolve([]);
+        });
+    } catch (e) {
+        return [];
+    }
+}
+
+function updateSelectedFileName(input) {
+    const label = document.getElementById('file-upload-label');
+    if (!label) return;
+    if (input.files && input.files.length > 0) {
+        const file = input.files[0];
+        label.innerText = `🎵 已選擇：${file.name}`;
+        const titleInput = document.getElementById('local-mp3-title');
+        if (titleInput && !titleInput.value.trim()) {
+            titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+        }
+    } else {
+        label.innerText = '📁 點擊選擇手機或電腦裡的 MP3 音訊檔案';
+    }
+}
+
+async function importMp3ToIndexedDB() {
+    const fileInput = document.getElementById('local-mp3-file');
+    const titleInput = document.getElementById('local-mp3-title');
+    const artistInput = document.getElementById('local-mp3-artist');
+    const status = document.getElementById('local-mp3-status');
+
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        status.innerText = '❌ 請先選擇一個 MP3 音訊檔案！';
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const songTitle = (titleInput.value || file.name.replace(/\.[^/.]+$/, '')).trim();
+    const songArtist = (artistInput.value || '未知歌手').trim();
+
+    try {
+        const db = await openMusicDB();
+        const id = 'song_' + Date.now();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction('localSongs', 'readwrite');
+            const store = tx.objectStore('localSongs');
+            store.put({
+                id,
+                title: songTitle,
+                artist: songArtist,
+                blob: file,
+                createdAt: Date.now()
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = (e) => reject(e.target.error);
+        });
+
+        status.innerText = `✅ 已將《${songTitle}》加入你的音樂盒！免開電腦隨時可聽！`;
+        titleInput.value = '';
+        artistInput.value = '';
+        fileInput.value = '';
+        document.getElementById('file-upload-label').innerText = '📁 點擊選擇手機或電腦裡的 MP3 音訊檔案';
+
+        await loadAllSongs();
+        renderDashboardRecommendations();
+    } catch (e) {
+        status.innerText = '❌ 儲存失敗，請確認瀏覽器空間是否充足。';
+    }
+}
+
+// 1. 自動判斷環境
 async function checkEnvironment() {
     try {
         const res = await fetch('/api/is_local');
@@ -115,20 +222,29 @@ async function checkEnvironment() {
     }
 }
 
-// 2. 讀取總歌單
+function getSongKey(song) {
+    return song.idbKey || song.src;
+}
+
+// 2. 讀取總歌單 (合併 songs.json 與手機匯入的 IndexedDB 歌曲)
 async function loadAllSongs() {
+    let jsonSongs = [];
     try {
         const response = await fetch('songs.json?t=' + Date.now());
-        allSongs = await response.json();
-        currentPlaylist = [...allSongs];
-        const countLabel = document.getElementById('all-songs-count-label');
-        if (countLabel) {
-            countLabel.innerText = `📌 全部收藏 • ${allSongs.length} 首歌曲`;
-        }
-        renderPlaylistCheckboxes();
+        jsonSongs = await response.json();
     } catch (error) {
         console.error("無法讀取 songs.json", error);
     }
+
+    const idbSongs = await getAllIndexedDBSongs();
+    allSongs = [...jsonSongs, ...idbSongs];
+    currentPlaylist = [...allSongs];
+
+    const countLabel = document.getElementById('all-songs-count-label');
+    if (countLabel) {
+        countLabel.innerText = `📌 全部收藏 • ${allSongs.length} 首歌曲`;
+    }
+    renderPlaylistCheckboxes();
 }
 
 // 3. 頂部主要分頁切換
@@ -154,6 +270,9 @@ function goToCreatePlaylist() {
 
 // 切換回推薦總覽首頁
 function openHomeDashboard() {
+    isReorderMode = false;
+    updateReorderUI();
+
     const listenBtn = document.getElementById('nav-listen-btn');
     switchTab('listen-tab', listenBtn);
 
@@ -190,7 +309,8 @@ function renderDashboardRecommendations() {
 
     const stats = getSongStats();
     const enriched = allSongs.map((song, idx) => {
-        const st = stats[song.src] || { count: 0, lastPlayed: 0 };
+        const key = getSongKey(song);
+        const st = stats[key] || { count: 0, lastPlayed: 0 };
         return {
             ...song,
             originalIndex: idx,
@@ -199,14 +319,12 @@ function renderDashboardRecommendations() {
         };
     });
 
-    // 更新 Hero 橫幅統計文字
     const totalPlays = enriched.reduce((acc, s) => acc + s.count, 0);
     const heroStatsText = document.getElementById('hero-stats-text');
     if (heroStatsText) {
         heroStatsText.innerText = `目前收藏共 ${allSongs.length} 首歌曲 • 累計放鬆聆聽 ${totalPlays} 次`;
     }
 
-    // 1. 最常聽的歌曲：依播放次數由高到低排序，取前 5 首
     const mostPlayed = [...enriched]
         .sort((a, b) => (b.count - a.count) || (b.lastPlayed - a.lastPlayed))
         .slice(0, 5);
@@ -217,7 +335,6 @@ function renderDashboardRecommendations() {
         mostGrid.appendChild(createSongCard(item, badgeText, mostPlayed));
     });
 
-    // 2. 最少或很久沒聽的歌曲：優先挑播放次數最少、或最久沒播的歌曲，取前 5 首
     const leastPlayed = [...enriched]
         .sort((a, b) => (a.count - b.count) || (a.lastPlayed - b.lastPlayed))
         .slice(0, 5);
@@ -247,14 +364,13 @@ function createSongCard(songItem, badgeText, listContext) {
     `;
 
     card.onclick = () => {
-        currentPlaylist = listContext.map(s => ({ title: s.title, artist: s.artist, src: s.src }));
-        const idx = currentPlaylist.findIndex(s => s.src === songItem.src);
+        currentPlaylist = listContext.map(s => ({ title: s.title, artist: s.artist, src: s.src, idbKey: s.idbKey }));
+        const idx = currentPlaylist.findIndex(s => getSongKey(s) === getSongKey(songItem));
         startPlayer(idx >= 0 ? idx : 0);
     };
     return card;
 }
 
-// 隨機放鬆播放按鈕
 function playRandomRelax() {
     if (allSongs.length === 0) return;
     currentPlaylist = [...allSongs];
@@ -274,13 +390,16 @@ function handleSearchInput(query) {
         openHomeDashboard();
         return;
     }
+    isReorderMode = false;
+    updateReorderUI();
+
     const listenBtn = document.getElementById('nav-listen-btn');
     switchTab('listen-tab', listenBtn);
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('song-list-view').classList.remove('hidden');
 
-    const editPlBtn = document.getElementById('edit-current-pl-btn');
-    if (editPlBtn) editPlBtn.classList.add('hidden');
+    document.getElementById('edit-current-pl-btn').classList.add('hidden');
+    document.getElementById('reorder-mode-btn').classList.add('hidden');
 
     currentPlaylistType = 'search';
     document.getElementById('list-title').innerText = `🔍 搜尋結果：「${query.trim()}」`;
@@ -294,8 +413,37 @@ function handleSearchInput(query) {
     renderSongs(container);
 }
 
-// 4. 顯示歌單歌曲列表 (所有歌曲 / 分類歌單 / 最常聽 / 最少聽)
+// 切換「✋ 編輯拖拉順序」模式
+function toggleReorderMode() {
+    if (currentPlaylistType !== 'custom') return;
+    isReorderMode = !isReorderMode;
+    updateReorderUI();
+    const container = document.getElementById('songs-container');
+    container.innerHTML = '';
+    renderSongs(container);
+}
+
+function updateReorderUI() {
+    const reorderBtn = document.getElementById('reorder-mode-btn');
+    const hintBanner = document.getElementById('reorder-hint-banner');
+    if (!reorderBtn || !hintBanner) return;
+
+    if (isReorderMode && currentPlaylistType === 'custom') {
+        reorderBtn.innerText = '✅ 完成排序';
+        reorderBtn.classList.add('active-mode');
+        hintBanner.classList.remove('hidden');
+    } else {
+        reorderBtn.innerText = '✋ 編輯拖拉順序';
+        reorderBtn.classList.remove('active-mode');
+        hintBanner.classList.add('hidden');
+    }
+}
+
+// 4. 顯示歌單歌曲列表
 function showSongList(type, playlistName = '') {
+    isReorderMode = false;
+    updateReorderUI();
+
     const listenBtn = document.getElementById('nav-listen-btn');
     switchTab('listen-tab', listenBtn);
 
@@ -310,12 +458,13 @@ function showSongList(type, playlistName = '') {
     const stats = getSongStats();
     const heroCover = document.getElementById('playlist-hero-cover');
     const editPlBtn = document.getElementById('edit-current-pl-btn');
+    const reorderBtn = document.getElementById('reorder-mode-btn');
 
-    // 更新左側音樂庫高亮狀態
     document.querySelectorAll('.lib-item').forEach(el => el.classList.remove('active'));
 
     if (type === 'all') {
         if (editPlBtn) editPlBtn.classList.add('hidden');
+        if (reorderBtn) reorderBtn.classList.add('hidden');
         setActiveStageChip('chip-all-songs');
         const allItem = document.getElementById('lib-item-all');
         if (allItem) allItem.classList.add('active');
@@ -329,6 +478,7 @@ function showSongList(type, playlistName = '') {
         renderSongs(container);
     } else if (type === 'most') {
         if (editPlBtn) editPlBtn.classList.add('hidden');
+        if (reorderBtn) reorderBtn.classList.add('hidden');
         setActiveStageChip('chip-most');
         document.getElementById('list-title').innerText = "🔥 最常聽的歌曲排行";
         document.getElementById('list-subtitle').innerText = "依照你的累計播放次數由高至低排序";
@@ -337,13 +487,14 @@ function showSongList(type, playlistName = '') {
             heroCover.innerText = '🔥';
         }
         currentPlaylist = [...allSongs].sort((a, b) => {
-            const ca = (stats[a.src] && stats[a.src].count) || 0;
-            const cb = (stats[b.src] && stats[b.src].count) || 0;
+            const ca = (stats[getSongKey(a)] && stats[getSongKey(a)].count) || 0;
+            const cb = (stats[getSongKey(b)] && stats[getSongKey(b)].count) || 0;
             return cb - ca;
         });
         renderSongs(container);
     } else if (type === 'least') {
         if (editPlBtn) editPlBtn.classList.add('hidden');
+        if (reorderBtn) reorderBtn.classList.add('hidden');
         setActiveStageChip('chip-least');
         document.getElementById('list-title').innerText = "🕰️ 最少或很久沒聽的歌曲";
         document.getElementById('list-subtitle').innerText = "從最少播放與最久未聽的歌曲開始重溫";
@@ -352,13 +503,14 @@ function showSongList(type, playlistName = '') {
             heroCover.innerText = '🕰️';
         }
         currentPlaylist = [...allSongs].sort((a, b) => {
-            const sa = stats[a.src] || { count: 0, lastPlayed: 0 };
-            const sb = stats[b.src] || { count: 0, lastPlayed: 0 };
+            const sa = stats[getSongKey(a)] || { count: 0, lastPlayed: 0 };
+            const sb = stats[getSongKey(b)] || { count: 0, lastPlayed: 0 };
             return (sa.count - sb.count) || (sa.lastPlayed - sb.lastPlayed);
         });
         renderSongs(container);
     } else if (type === 'custom') {
         if (editPlBtn) editPlBtn.classList.remove('hidden');
+        if (reorderBtn) reorderBtn.classList.remove('hidden');
         document.querySelectorAll('.stage-filter-bar .filter-pill').forEach(p => p.classList.remove('active'));
         const activePlItem = document.getElementById(`lib-pl-${playlistName}`);
         if (activePlItem) activePlItem.classList.add('active');
@@ -370,11 +522,11 @@ function showSongList(type, playlistName = '') {
         }
         document.getElementById('list-title').innerText = playlistName;
         const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
-        const allowedSrcs = playlists[playlistName] || [];
+        const allowedKeys = playlists[playlistName] || [];
         
         currentPlaylist = [];
-        allowedSrcs.forEach(src => {
-            const foundSong = allSongs.find(s => s.src === src);
+        allowedKeys.forEach(k => {
+            const foundSong = allSongs.find(s => getSongKey(s) === k || s.src === k);
             if (foundSong) currentPlaylist.push(foundSong);
         });
         document.getElementById('list-subtitle').innerText = `自訂分類歌單 • 共 ${currentPlaylist.length} 首歌曲`;
@@ -382,7 +534,7 @@ function showSongList(type, playlistName = '') {
     }
 }
 
-// 5. 渲染歌曲清單 (加上播放次數標籤與移動按鈕)
+// 5. 渲染歌曲清單 (當開啟「編輯拖拉順序」時，支援滑鼠與手機觸控直接上下拖拉排序！)
 function renderSongs(container) {
     if(currentPlaylist.length === 0) {
         container.innerHTML = '<p style="color:#b4b8d8; text-align:center; padding: 28px 0;">此清單內目前沒有歌曲</p>';
@@ -393,11 +545,75 @@ function renderSongs(container) {
     currentPlaylist.forEach((song, index) => {
         const div = document.createElement('div');
         div.className = 'item-row';
-        const st = stats[song.src] || { count: 0, lastPlayed: 0 };
+        div.dataset.index = index;
+        const st = stats[getSongKey(song)] || { count: 0, lastPlayed: 0 };
         
         const leftWrap = document.createElement('div');
         leftWrap.className = 'song-row-left';
-        leftWrap.onclick = () => startPlayer(index);
+
+        if (currentPlaylistType === 'custom' && isReorderMode) {
+            div.classList.add('reorder-active');
+            div.draggable = true;
+
+            const handle = document.createElement('span');
+            handle.className = 'drag-handle';
+            handle.innerText = '☰';
+            handle.title = '按住上下拖拉調整順序';
+            leftWrap.appendChild(handle);
+
+            // 電腦滑鼠 Drag & Drop 事件
+            div.addEventListener('dragstart', (e) => {
+                draggedSongIndex = index;
+                div.classList.add('dragging');
+                if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+            });
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                div.classList.add('drag-over');
+            });
+            div.addEventListener('dragleave', () => {
+                div.classList.remove('drag-over');
+            });
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over');
+                if (draggedSongIndex !== null && draggedSongIndex !== index) {
+                    reorderPlaylistArray(draggedSongIndex, index);
+                }
+            });
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+                draggedSongIndex = null;
+            });
+
+            // 手機觸控 Touch 拖拉事件
+            handle.addEventListener('touchstart', () => {
+                draggedSongIndex = index;
+                div.classList.add('dragging');
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', (e) => {
+                if (draggedSongIndex === null || e.touches.length === 0) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+                const targetRow = targetEl ? targetEl.closest('.item-row') : null;
+                if (targetRow && targetRow.dataset.index !== undefined) {
+                    const overIndex = parseInt(targetRow.dataset.index, 10);
+                    if (!isNaN(overIndex) && overIndex !== draggedSongIndex) {
+                        reorderPlaylistArray(draggedSongIndex, overIndex);
+                        draggedSongIndex = overIndex;
+                    }
+                }
+            }, { passive: false });
+
+            handle.addEventListener('touchend', () => {
+                div.classList.remove('dragging');
+                draggedSongIndex = null;
+            });
+        } else {
+            leftWrap.onclick = () => startPlayer(index);
+        }
 
         const numSpan = document.createElement('span');
         numSpan.className = 'track-num';
@@ -414,52 +630,23 @@ function renderSongs(container) {
         const statPill = document.createElement('span');
         statPill.className = 'song-stat-pill';
         statPill.innerText = st.count > 0 ? `🎧 已聽 ${st.count} 次` : '✨ 尚未播放';
-        statPill.onclick = () => startPlayer(index);
-        div.appendChild(statPill);
-
-        if (currentPlaylistType === 'custom') {
-            const btnDiv = document.createElement('div');
-            btnDiv.className = 'reorder-btns';
-            
-            if (index > 0) {
-                const upBtn = document.createElement('button');
-                upBtn.className = 'reorder-btn';
-                upBtn.innerText = '▲';
-                upBtn.onclick = (e) => {
-                    e.stopPropagation(); 
-                    moveSong(index, -1);
-                };
-                btnDiv.appendChild(upBtn);
-            }
-
-            if (index < currentPlaylist.length - 1) {
-                const downBtn = document.createElement('button');
-                downBtn.className = 'reorder-btn';
-                downBtn.innerText = '▼';
-                downBtn.onclick = (e) => {
-                    e.stopPropagation(); 
-                    moveSong(index, 1);
-                };
-                btnDiv.appendChild(downBtn);
-            }
-            div.appendChild(btnDiv);
+        if (!isReorderMode) {
+            statPill.onclick = () => startPlayer(index);
         }
+        div.appendChild(statPill);
 
         container.appendChild(div);
     });
 }
 
-function moveSong(index, direction) {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= currentPlaylist.length) return;
-
-    const temp = currentPlaylist[index];
-    currentPlaylist[index] = currentPlaylist[targetIndex];
-    currentPlaylist[targetIndex] = temp;
+function reorderPlaylistArray(fromIndex, toIndex) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= currentPlaylist.length || toIndex >= currentPlaylist.length) return;
+    const [movedSong] = currentPlaylist.splice(fromIndex, 1);
+    currentPlaylist.splice(toIndex, 0, movedSong);
 
     if (currentPlaylistType === 'custom' && currentPlaylistName) {
         const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
-        playlists[currentPlaylistName] = currentPlaylist.map(song => song.src);
+        playlists[currentPlaylistName] = currentPlaylist.map(song => getSongKey(song));
         localStorage.setItem('myPlaylists', JSON.stringify(playlists));
     }
 
@@ -502,7 +689,7 @@ async function showPlaylistList() {
     });
 }
 
-// 6. 核心音樂播放器控制
+// 6. 核心音樂播放器控制 (搭配可愛跑步貓咪動畫狀態)
 function startPlayer(index) {
     songIndex = index;
     const song = currentPlaylist[songIndex];
@@ -573,6 +760,7 @@ function playSong() {
     }
     isPlaying = true;
     playBtn.innerText = '⏸';
+    if (playerView) playerView.classList.add('is-playing');
     audio.play();
     if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
@@ -581,6 +769,7 @@ function playSong() {
 function pauseSong() {
     isPlaying = false;
     playBtn.innerText = '▶';
+    if (playerView) playerView.classList.remove('is-playing');
     audio.pause();
     if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
@@ -665,6 +854,14 @@ function seekByClientX(clientX) {
 function setupAudioEvents() {
     audio.addEventListener('loadedmetadata', () => {
         if (durationEl) durationEl.innerText = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('play', () => {
+        if (playerView) playerView.classList.add('is-playing');
+    });
+
+    audio.addEventListener('pause', () => {
+        if (playerView) playerView.classList.remove('is-playing');
     });
 
     audio.addEventListener('timeupdate', () => {
@@ -773,18 +970,19 @@ async function batchDownloadSongs() {
     }
 }
 
-// ================= 歌單建立、編輯與刪除 (手機與電腦皆可直接運作，免跑 Python！) =================
+// ================= 歌單建立、編輯與刪除 =================
 function renderPlaylistCheckboxes(selectedSrcs = []) {
     const container = document.getElementById('playlist-songs-checkboxes');
     if(!container) return;
     container.innerHTML = '';
     if(allSongs.length === 0) { container.innerHTML = '暫無歌曲可供選擇'; return; }
     allSongs.forEach(song => {
+        const key = getSongKey(song);
         const div = document.createElement('div');
         div.className = 'checkbox-item';
-        const isChecked = selectedSrcs.includes(song.src) ? 'checked' : '';
+        const isChecked = (selectedSrcs.includes(key) || selectedSrcs.includes(song.src)) ? 'checked' : '';
         div.innerHTML = `
-            <input type="checkbox" name="playlist-song" value="${song.src}" ${isChecked}>
+            <input type="checkbox" name="playlist-song" value="${key}" ${isChecked}>
             <label onclick="this.previousElementSibling.click()" style="cursor:pointer; flex:1;">${song.title} - <span style="color:#b4b8d8;">${song.artist}</span></label>
         `;
         container.appendChild(div);
@@ -811,7 +1009,6 @@ async function createPlaylist() {
     playlists[name] = selectedSongs;
     localStorage.setItem('myPlaylists', JSON.stringify(playlists));
 
-    // 若電腦後台剛好有開，也順便背景備份一份，但手機離線也完全不影響使用
     if (isLocalMode) {
         fetch('/api/save_playlist', {
             method: 'POST',
@@ -855,8 +1052,16 @@ function renderManagePlaylists() {
 
         const editBtn = document.createElement('button');
         editBtn.className = 'copy-pill-btn';
-        editBtn.innerText = '✏️ 編輯';
+        editBtn.innerText = '✏️ 增減歌曲';
         editBtn.onclick = () => loadPlaylistIntoEditor(name);
+
+        const orderBtn = document.createElement('button');
+        orderBtn.className = 'copy-pill-btn';
+        orderBtn.innerText = '✋ 拖拉排序';
+        orderBtn.onclick = () => {
+            showSongList('custom', name);
+            if (!isReorderMode) toggleReorderMode();
+        };
 
         const delBtn = document.createElement('button');
         delBtn.className = 'memo-delete-btn';
@@ -866,6 +1071,7 @@ function renderManagePlaylists() {
         delBtn.onclick = () => deletePlaylist(name);
 
         actions.appendChild(editBtn);
+        actions.appendChild(orderBtn);
         actions.appendChild(delBtn);
 
         div.appendChild(info);
@@ -905,7 +1111,7 @@ function deletePlaylist(name) {
     }
 }
 
-// 9. 📝 備忘錄專用核心邏輯 (手機端/電腦端皆可執行)
+// 9. 📝 備忘錄專用核心邏輯
 function renderMemo() {
     const container = document.getElementById('memo-list-container');
     if (!container) return;

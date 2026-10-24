@@ -8,11 +8,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="我的私人音樂盒 PRO">
     <title>我的私人音樂盒 PRO</title>
-    <link rel="manifest" href="manifest.json?v=20261024_v5">
+    <link rel="manifest" href="manifest.json?v=20261024_v6">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261024_v5">
+    <link rel="stylesheet" href="style.css?v=20261024_v6">
 </head>
 <body>
 
@@ -34,9 +34,9 @@
         <nav class="top-tabs">
             <button id="nav-listen-btn" class="nav-btn active" onclick="switchTab('listen-tab', this)">🎵 音樂首頁</button>
             <button id="nav-playlist-btn" class="nav-btn" onclick="switchTab('playlist-tab', this)">📂 管理歌單</button>
-            <button id="nav-memo-btn" class="nav-btn" onclick="switchTab('memo-tab', this)">📝 備忘錄</button>
-            <!-- 電腦開機啟動 Python 後台時才會自動顯示此按鈕，手機外出時自動隱藏 -->
-            <button id="nav-add-btn" class="nav-btn hidden" onclick="switchTab('add-tab', this)">📥 新增歌曲</button>
+            <button id="nav-memo-btn" class="nav-btn" onclick="switchTab('memo-tab', this)">📝 加歌 / 備忘</button>
+            <!-- 電腦開機啟動 Python 後台時才會自動顯示此按鈕 -->
+            <button id="nav-add-btn" class="nav-btn hidden" onclick="switchTab('add-tab', this)">📥 電腦後台下載</button>
         </nav>
     </header>
 
@@ -86,7 +86,7 @@
         <!-- ================= 右側/中央主面板 ================= -->
         <main class="center-stage">
 
-            <!-- 1. 聽歌主分頁 (包含「推薦總覽」與「歌單歌曲清單」兩種視圖) -->
+            <!-- 1. 聽歌主分頁 -->
             <div id="listen-tab" class="tab-content active">
 
                 <!-- 頂部快速切換膠囊 -->
@@ -152,10 +152,15 @@
                             <p id="list-subtitle">點擊任一首歌曲立即開始播放</p>
                             <div class="playlist-hero-btns">
                                 <button class="hero-play-btn" onclick="playCurrentListFromStart()">▶ 播放此歌單</button>
-                                <button id="edit-current-pl-btn" class="hero-link-btn hidden" onclick="editCurrentCustomPlaylist()">✏️ 編輯此歌單歌曲</button>
+                                <button id="reorder-mode-btn" class="hero-link-btn hidden" onclick="toggleReorderMode()">✋ 編輯拖拉順序</button>
+                                <button id="edit-current-pl-btn" class="hero-link-btn hidden" onclick="editCurrentCustomPlaylist()">✏️ 增減歌單歌曲</button>
                                 <button class="back-btn" onclick="openHomeDashboard()">‹ 返回推薦總覽</button>
                             </div>
                         </div>
+                    </div>
+
+                    <div id="reorder-hint-banner" class="reorder-hint-banner hidden">
+                        <span>✨ <strong>拖拉排序模式已開啟</strong>：請直接按住歌曲左側的 <code>☰</code> 圖示上下拖拉調整順序，完成後點右上角「✅ 完成排序」。</span>
                     </div>
 
                     <div id="songs-container" class="tracklist-container"></div>
@@ -163,12 +168,12 @@
 
             </div>
 
-            <!-- ================= 2. 建立與編輯歌單分頁 (手機、電腦皆可直接免後台操作！) ================= -->
+            <!-- ================= 2. 建立與編輯歌單分頁 ================= -->
             <div id="playlist-tab" class="tab-content">
                 <div class="card">
                     <h3 class="card-title">📂 建立或編輯分類歌單</h3>
                     <p class="helper-text">
-                        手機與電腦皆可直接建立或修改歌單！輸入歌單名稱並勾選歌曲後即可儲存（若輸入相同名稱可直接更新覆蓋該歌單）。
+                        手機與電腦皆可直接建立或修改歌單！輸入歌單名稱並勾選歌曲後即可儲存（若要調整歌單內歌曲順序，請點進該歌單並開啟「✋ 編輯拖拉順序」）。
                     </p>
                     <div id="local-playlist-form">
                         <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 深夜放鬆、開車兜風)">
@@ -186,23 +191,42 @@
 
                     <hr class="divider">
 
-                    <h4 class="sub-heading">🗂️ 管理現有分類歌單（點擊「編輯」可載入修改）：</h4>
+                    <h4 class="sub-heading">🗂️ 管理現有分類歌單：</h4>
                     <div id="manage-playlists-container"></div>
                 </div>
             </div>
 
-            <!-- ================= 3. 📝 備忘錄分頁 (手機、電腦通用) ================= -->
+            <!-- ================= 3. 📝 免開電腦加歌 & 備忘錄分頁 ================= -->
             <div id="memo-tab" class="tab-content">
-                <div class="card">
-                    <h3 class="card-title">📝 待下載歌曲備忘錄</h3>
+                <div class="card" style="margin-bottom: 20px;">
+                    <h3 class="card-title">📱 免開電腦！手機直接匯入 MP3 歌曲</h3>
                     <p class="helper-text">
-                        外出用手機滑到想聽的歌？先存進這裡。等回家打開電腦後台時，點擊下方「一鍵複製資料」貼上就能批次下載！
+                        外出時不想等開電腦跑 Python？你可以先用線上轉檔工具把網址轉成 MP3 下載到手機，再從下方直接把 MP3 檔案加進音樂盒（會永久存在你的手機瀏覽器資料庫中，離線也能聽）！
+                    </p>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+                        <a href="https://cnvmp3.com/" target="_blank" rel="noopener" class="copy-pill-btn" style="text-decoration:none;">🔗 開啟線上 YT 轉 MP3 工具 (CnvMP3)</a>
+                        <a href="https://cobalt.tools/" target="_blank" rel="noopener" class="copy-pill-btn" style="text-decoration:none;">🔗 備用轉檔工具 (Cobalt)</a>
+                    </div>
+                    <input type="text" id="local-mp3-title" placeholder="歌曲名稱 (若留空會自動使用檔名)">
+                    <input type="text" id="local-mp3-artist" placeholder="歌手名稱 (例如: 周杰倫)">
+                    <label class="file-upload-box">
+                        <input type="file" id="local-mp3-file" accept="audio/*,.mp3,.m4a" onchange="updateSelectedFileName(this)" hidden>
+                        <span id="file-upload-label">📁 點擊選擇手機或電腦裡的 MP3 音訊檔案</span>
+                    </label>
+                    <button class="action-btn" onclick="importMp3ToIndexedDB()">✨ 立即加入音樂盒（免 Python）</button>
+                    <p id="local-mp3-status" class="status-msg"></p>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">📝 待下載歌曲備忘錄（回家給電腦批次下載）</h3>
+                    <p class="helper-text">
+                        如果只想先記下 YouTube 網址，等回家開電腦再一次批次轉檔，可先存在下方備忘錄：
                     </p>
                     <input type="text" id="memo-url" placeholder="請貼上 YouTube 網址">
                     <input type="text" id="memo-title" placeholder="歌曲名稱">
                     <input type="text" id="memo-artist" placeholder="歌手名稱">
                     <input type="text" id="memo-filename" placeholder="英文副檔名 (例如: zuijin)">
-                    <button class="action-btn" onclick="addToMemo()">💾 存入備忘錄</button>
+                    <button class="action-btn secondary-action" onclick="addToMemo()">💾 存入備忘錄</button>
                     
                     <hr class="divider">
                     
@@ -214,10 +238,10 @@
                 </div>
             </div>
 
-            <!-- ================= 4. 新增歌曲分頁 (僅在電腦啟動 Python 後台時自動顯示) ================= -->
+            <!-- ================= 4. 電腦後台下載分頁 (僅在電腦啟動 Python 後台時自動顯示) ================= -->
             <div id="add-tab" class="tab-content">
                 <div class="card">
-                    <h3 class="card-title">📥 從 YouTube 下載新歌曲</h3>
+                    <h3 class="card-title">📥 從 YouTube 下載新歌曲 (Python 後台)</h3>
                     <div id="local-add-form" class="form-group">
                         <input type="text" id="yt-url" placeholder="請貼上 YouTube 網址">
                         <input type="text" id="song-title" placeholder="歌曲名稱 (例如: 青花瓷)">
@@ -239,7 +263,7 @@
         </main>
     </div>
 
-    <!-- ================= 底部常駐播放器控制列 ================= -->
+    <!-- ================= 底部常駐播放器控制列 (附可愛跑步貓咪進度條🐱) ================= -->
     <footer id="player-view" class="bottom-player-bar">
         <audio id="audio" playsinline></audio>
 
@@ -252,7 +276,7 @@
             </div>
         </div>
 
-        <!-- 中央：播放控制按鈕 + 進度條 -->
+        <!-- 中央：播放控制按鈕 + 可愛貓咪進度條 -->
         <div class="player-center-controls">
             <div class="control-buttons-row">
                 <button id="shuffle-btn" class="ctrl-btn-text" title="切換隨機播放">🔀 隨機：關</button>
@@ -264,7 +288,37 @@
                 <span id="current-time" class="time-label">0:00</span>
                 <div class="progress-container" id="progress-container">
                     <div class="progress" id="progress">
-                        <span class="progress-thumb"></span>
+                        <!-- 可愛跑步貓咪進度條圖示 -->
+                        <div class="progress-cat-thumb" id="progress-cat" title="拖拉貓咪調整進度">
+                            <span class="cat-paw-trail">🐾</span>
+                            <svg class="cute-cat-svg" viewBox="0 0 64 54" width="34" height="29" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <!-- 搖擺貓尾巴 -->
+                                <path class="cat-tail" d="M10 34 C3 28, 3 18, 9 15 C13 13, 14 19, 11 23" stroke="#fff5eb" stroke-width="5" stroke-linecap="round" fill="none"/>
+                                <!-- 後腳與前腳 (跑步擺動) -->
+                                <ellipse class="cat-leg-back" cx="19" cy="45" rx="4.5" ry="6" fill="#fde4cf"/>
+                                <ellipse class="cat-leg-front" cx="41" cy="45" rx="4.5" ry="6" fill="#fde4cf"/>
+                                <!-- 圓滾滾貓咪身體 -->
+                                <rect x="12" y="22" width="34" height="22" rx="11" fill="#fff5eb" stroke="#f4a261" stroke-width="2"/>
+                                <!-- 橘白虎斑花紋 -->
+                                <path d="M23 22 Q25 28 27 22" stroke="#f4a261" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M31 22 Q33 27 35 22" stroke="#f4a261" stroke-width="3" stroke-linecap="round"/>
+                                <!-- 貓咪大頭與耳朵 -->
+                                <path d="M34 15 L36 4 L44 11 Z" fill="#fff5eb" stroke="#f4a261" stroke-width="2" stroke-linejoin="round"/>
+                                <path d="M36 12 L37 6 L42 11 Z" fill="#ffb4a2"/>
+                                <path d="M47 11 L55 4 L57 15 Z" fill="#f4a261" stroke="#f4a261" stroke-width="2" stroke-linejoin="round"/>
+                                <path d="M49 11 L54 6 L55 12 Z" fill="#ffb4a2"/>
+                                <circle cx="45" cy="21" r="13" fill="#fff5eb" stroke="#f4a261" stroke-width="2"/>
+                                <!-- 可愛眼睛與粉紅腮紅 -->
+                                <circle cx="41" cy="20" r="2.2" fill="#2b2d42"/>
+                                <circle cx="50" cy="20" r="2.2" fill="#2b2d42"/>
+                                <circle cx="40.3" cy="19.3" r="0.8" fill="#ffffff"/>
+                                <circle cx="49.3" cy="19.3" r="0.8" fill="#ffffff"/>
+                                <ellipse cx="37.5" cy="23.5" rx="2.5" ry="1.5" fill="#ff8fa3" opacity="0.75"/>
+                                <ellipse cx="52.5" cy="23.5" rx="2.5" ry="1.5" fill="#ff8fa3" opacity="0.75"/>
+                                <!-- 粉紅小鼻與W嘴 -->
+                                <path d="M44.5 22.5 Q45.5 24.5 43 24.5 M45.5 22.5 Q45.5 24.5 48 24.5" stroke="#2b2d42" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+                            </svg>
+                        </div>
                     </div>
                 </div>
                 <span id="duration" class="time-label">0:00</span>
@@ -278,6 +332,6 @@
         </div>
     </footer>
 
-    <script src="script.js?v=20261024_v5"></script>
+    <script src="script.js?v=20261024_v6"></script>
 </body>
 </html>
