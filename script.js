@@ -52,6 +52,7 @@ async function init() {
     await checkEnvironment();
     await loadAllSongs();
     showPlaylistList();
+    renderManagePlaylists();
     renderDashboardRecommendations();
     setupAudioEvents();
     setupMediaSessionHandlers();
@@ -94,7 +95,7 @@ function formatLastPlayed(timestamp, count) {
     return `${diffDays} 天前`;
 }
 
-// 1. 自動判斷環境
+// 1. 自動判斷環境：只有在電腦開啟本地後台時，才顯示「📥 新增歌曲」按鈕；手機外出時自動隱藏，不顯示多餘提示框！
 async function checkEnvironment() {
     try {
         const res = await fetch('/api/is_local');
@@ -104,11 +105,13 @@ async function checkEnvironment() {
         isLocalMode = false;
     }
 
-    if (!isLocalMode) {
-        document.getElementById('local-add-form').classList.add('hidden');
-        document.getElementById('github-add-msg').classList.remove('hidden');
-        document.getElementById('local-playlist-form').classList.add('hidden');
-        document.getElementById('github-playlist-msg').classList.remove('hidden');
+    const navAddBtn = document.getElementById('nav-add-btn');
+    if (navAddBtn) {
+        if (isLocalMode) {
+            navAddBtn.classList.remove('hidden');
+        } else {
+            navAddBtn.classList.add('hidden');
+        }
     }
 }
 
@@ -140,18 +143,19 @@ function switchTab(tabId, btnElement) {
     
     if(tabId === 'playlist-tab') {
         renderPlaylistCheckboxes();
+        renderManagePlaylists();
     }
 }
 
 function goToCreatePlaylist() {
-    const btns = document.querySelectorAll('.top-tabs .nav-btn');
-    switchTab('playlist-tab', btns[2]);
+    const plBtn = document.getElementById('nav-playlist-btn');
+    switchTab('playlist-tab', plBtn);
 }
 
 // 切換回推薦總覽首頁
 function openHomeDashboard() {
-    const btns = document.querySelectorAll('.top-tabs .nav-btn');
-    switchTab('listen-tab', btns[0]);
+    const listenBtn = document.getElementById('nav-listen-btn');
+    switchTab('listen-tab', listenBtn);
 
     document.getElementById('dashboard-view').classList.remove('hidden');
     document.getElementById('song-list-view').classList.add('hidden');
@@ -270,10 +274,13 @@ function handleSearchInput(query) {
         openHomeDashboard();
         return;
     }
-    const btns = document.querySelectorAll('.top-tabs .nav-btn');
-    switchTab('listen-tab', btns[0]);
+    const listenBtn = document.getElementById('nav-listen-btn');
+    switchTab('listen-tab', listenBtn);
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('song-list-view').classList.remove('hidden');
+
+    const editPlBtn = document.getElementById('edit-current-pl-btn');
+    if (editPlBtn) editPlBtn.classList.add('hidden');
 
     currentPlaylistType = 'search';
     document.getElementById('list-title').innerText = `🔍 搜尋結果：「${query.trim()}」`;
@@ -289,8 +296,8 @@ function handleSearchInput(query) {
 
 // 4. 顯示歌單歌曲列表 (所有歌曲 / 分類歌單 / 最常聽 / 最少聽)
 function showSongList(type, playlistName = '') {
-    const btns = document.querySelectorAll('.top-tabs .nav-btn');
-    switchTab('listen-tab', btns[0]);
+    const listenBtn = document.getElementById('nav-listen-btn');
+    switchTab('listen-tab', listenBtn);
 
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('song-list-view').classList.remove('hidden');
@@ -302,11 +309,13 @@ function showSongList(type, playlistName = '') {
     container.innerHTML = '';
     const stats = getSongStats();
     const heroCover = document.getElementById('playlist-hero-cover');
+    const editPlBtn = document.getElementById('edit-current-pl-btn');
 
     // 更新左側音樂庫高亮狀態
     document.querySelectorAll('.lib-item').forEach(el => el.classList.remove('active'));
 
     if (type === 'all') {
+        if (editPlBtn) editPlBtn.classList.add('hidden');
         setActiveStageChip('chip-all-songs');
         const allItem = document.getElementById('lib-item-all');
         if (allItem) allItem.classList.add('active');
@@ -319,6 +328,7 @@ function showSongList(type, playlistName = '') {
         currentPlaylist = [...allSongs];
         renderSongs(container);
     } else if (type === 'most') {
+        if (editPlBtn) editPlBtn.classList.add('hidden');
         setActiveStageChip('chip-most');
         document.getElementById('list-title').innerText = "🔥 最常聽的歌曲排行";
         document.getElementById('list-subtitle').innerText = "依照你的累計播放次數由高至低排序";
@@ -333,6 +343,7 @@ function showSongList(type, playlistName = '') {
         });
         renderSongs(container);
     } else if (type === 'least') {
+        if (editPlBtn) editPlBtn.classList.add('hidden');
         setActiveStageChip('chip-least');
         document.getElementById('list-title').innerText = "🕰️ 最少或很久沒聽的歌曲";
         document.getElementById('list-subtitle').innerText = "從最少播放與最久未聽的歌曲開始重溫";
@@ -347,6 +358,7 @@ function showSongList(type, playlistName = '') {
         });
         renderSongs(container);
     } else if (type === 'custom') {
+        if (editPlBtn) editPlBtn.classList.remove('hidden');
         document.querySelectorAll('.stage-filter-bar .filter-pill').forEach(p => p.classList.remove('active'));
         const activePlItem = document.getElementById(`lib-pl-${playlistName}`);
         if (activePlItem) activePlItem.classList.add('active');
@@ -456,7 +468,7 @@ function moveSong(index, direction) {
     renderSongs(container);
 }
 
-// 渲染左側欄分類歌單清單 (仿圖片二左側欄歌單列表)
+// 渲染左側欄分類歌單清單
 async function showPlaylistList() {
     const container = document.getElementById('playlist-names-container');
     if (!container) return;
@@ -466,7 +478,7 @@ async function showPlaylistList() {
     const names = Object.keys(playlists);
     
     if(names.length === 0) {
-        container.innerHTML = '<p style="color:#7e83a8; font-size:12.5px; padding: 8px 10px;">尚無自訂歌單，點上方「＋ 建立歌單」新增</p>';
+        container.innerHTML = '<p style="color:#7e83a8; font-size:12.5px; padding: 8px 10px;">尚無自訂歌單，點上方「＋ 管理歌單」即可建立</p>';
         return;
     }
     
@@ -761,7 +773,8 @@ async function batchDownloadSongs() {
     }
 }
 
-function renderPlaylistCheckboxes() {
+// ================= 歌單建立、編輯與刪除 (手機與電腦皆可直接運作，免跑 Python！) =================
+function renderPlaylistCheckboxes(selectedSrcs = []) {
     const container = document.getElementById('playlist-songs-checkboxes');
     if(!container) return;
     container.innerHTML = '';
@@ -769,8 +782,18 @@ function renderPlaylistCheckboxes() {
     allSongs.forEach(song => {
         const div = document.createElement('div');
         div.className = 'checkbox-item';
-        div.innerHTML = `<input type="checkbox" name="playlist-song" value="${song.src}"> <label>${song.title} - ${song.artist}</label>`;
+        const isChecked = selectedSrcs.includes(song.src) ? 'checked' : '';
+        div.innerHTML = `
+            <input type="checkbox" name="playlist-song" value="${song.src}" ${isChecked}>
+            <label onclick="this.previousElementSibling.click()" style="cursor:pointer; flex:1;">${song.title} - <span style="color:#b4b8d8;">${song.artist}</span></label>
+        `;
         container.appendChild(div);
+    });
+}
+
+function toggleAllPlaylistCheckboxes(checked) {
+    document.querySelectorAll('input[name="playlist-song"]').forEach(cb => {
+        cb.checked = checked;
     });
 }
 
@@ -788,10 +811,98 @@ async function createPlaylist() {
     playlists[name] = selectedSongs;
     localStorage.setItem('myPlaylists', JSON.stringify(playlists));
 
-    status.innerText = `✅ 歌單【${name}】已儲存，並顯示於左側音樂庫！`;
+    // 若電腦後台剛好有開，也順便背景備份一份，但手機離線也完全不影響使用
+    if (isLocalMode) {
+        fetch('/api/save_playlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, songs: selectedSongs })
+        }).catch(() => {});
+    }
+
+    status.innerText = `✅ 歌單【${name}】已儲存成功！`;
     document.getElementById('new-playlist-name').value = '';
     checkboxes.forEach(cb => cb.checked = false);
     showPlaylistList();
+    renderManagePlaylists();
+}
+
+function renderManagePlaylists() {
+    const container = document.getElementById('manage-playlists-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
+    const names = Object.keys(playlists);
+
+    if (names.length === 0) {
+        container.innerHTML = '<p style="color:#b4b8d8; font-size:13.5px; text-align:center;">目前還沒有建立任何分類歌單</p>';
+        return;
+    }
+
+    names.forEach(name => {
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.style.cursor = 'default';
+
+        const info = document.createElement('div');
+        info.className = 'song-info';
+        info.innerHTML = `<strong>🗂️ ${name}</strong><span class="song-artist-sub">共 ${playlists[name].length} 首歌曲</span>`;
+
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '8px';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'copy-pill-btn';
+        editBtn.innerText = '✏️ 編輯';
+        editBtn.onclick = () => loadPlaylistIntoEditor(name);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'memo-delete-btn';
+        delBtn.style.width = 'auto';
+        delBtn.style.padding = '0 10px';
+        delBtn.innerText = '🗑️ 刪除';
+        delBtn.onclick = () => deletePlaylist(name);
+
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+
+        div.appendChild(info);
+        div.appendChild(actions);
+        container.appendChild(div);
+    });
+}
+
+function loadPlaylistIntoEditor(name) {
+    const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
+    const selectedSrcs = playlists[name] || [];
+    const nameInput = document.getElementById('new-playlist-name');
+    if (nameInput) nameInput.value = name;
+    renderPlaylistCheckboxes(selectedSrcs);
+    const status = document.getElementById('playlist-status');
+    if (status) status.innerText = `✏️ 已載入歌單【${name}】，勾選或取消勾選歌曲後點擊「儲存歌單」即可完成修改！`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function editCurrentCustomPlaylist() {
+    if (currentPlaylistType !== 'custom' || !currentPlaylistName) return;
+    const plName = currentPlaylistName;
+    const plBtn = document.getElementById('nav-playlist-btn');
+    switchTab('playlist-tab', plBtn);
+    loadPlaylistIntoEditor(plName);
+}
+
+function deletePlaylist(name) {
+    if (!confirm(`確定要刪除歌單【${name}】嗎？`)) return;
+    const playlists = JSON.parse(localStorage.getItem('myPlaylists') || '{}');
+    delete playlists[name];
+    localStorage.setItem('myPlaylists', JSON.stringify(playlists));
+    showPlaylistList();
+    renderManagePlaylists();
+    if (currentPlaylistType === 'custom' && currentPlaylistName === name) {
+        openHomeDashboard();
+    }
 }
 
 // 9. 📝 備忘錄專用核心邏輯 (手機端/電腦端皆可執行)

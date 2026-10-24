@@ -8,15 +8,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="我的私人音樂盒 PRO">
     <title>我的私人音樂盒 PRO</title>
-    <link rel="manifest" href="manifest.json?v=20261024_v4">
+    <link rel="manifest" href="manifest.json?v=20261024_v5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261024_v4">
+    <link rel="stylesheet" href="style.css?v=20261024_v5">
 </head>
 <body>
 
-    <!-- 頂部全域導覽與搜尋列 (仿 Spotify 頂部列) -->
+    <!-- 頂部全域導覽與搜尋列 -->
     <header class="top-nav-bar">
         <div class="brand-area" onclick="openHomeDashboard()">
             <div class="brand-logo">🌙</div>
@@ -32,10 +32,11 @@
         </div>
 
         <nav class="top-tabs">
-            <button class="nav-btn active" onclick="switchTab('listen-tab', this)">🎵 音樂首頁</button>
-            <button class="nav-btn" onclick="switchTab('add-tab', this)">📥 新增歌曲</button>
-            <button class="nav-btn" onclick="switchTab('playlist-tab', this)">📂 建立歌單</button>
-            <button class="nav-btn" onclick="switchTab('memo-tab', this)">📝 備忘錄</button>
+            <button id="nav-listen-btn" class="nav-btn active" onclick="switchTab('listen-tab', this)">🎵 音樂首頁</button>
+            <button id="nav-playlist-btn" class="nav-btn" onclick="switchTab('playlist-tab', this)">📂 管理歌單</button>
+            <button id="nav-memo-btn" class="nav-btn" onclick="switchTab('memo-tab', this)">📝 備忘錄</button>
+            <!-- 電腦開機啟動 Python 後台時才會自動顯示此按鈕，手機外出時自動隱藏 -->
+            <button id="nav-add-btn" class="nav-btn hidden" onclick="switchTab('add-tab', this)">📥 新增歌曲</button>
         </nav>
     </header>
 
@@ -49,7 +50,7 @@
                     <span class="lib-icon">📚</span>
                     <span>你的音樂庫</span>
                 </div>
-                <button class="create-pl-pill" onclick="goToCreatePlaylist()">＋ 建立歌單</button>
+                <button class="create-pl-pill" onclick="goToCreatePlaylist()">＋ 管理歌單</button>
             </div>
 
             <div class="library-chips">
@@ -67,7 +68,7 @@
                     </div>
                 </div>
 
-                <!-- 固定項目：所有歌曲 (仿 Spotify 已按讚的歌曲) -->
+                <!-- 固定項目：所有歌曲 -->
                 <div id="lib-item-all" class="lib-item" onclick="showSongList('all')">
                     <div class="lib-cover cover-liked">💜</div>
                     <div class="lib-info">
@@ -88,7 +89,7 @@
             <!-- 1. 聽歌主分頁 (包含「推薦總覽」與「歌單歌曲清單」兩種視圖) -->
             <div id="listen-tab" class="tab-content active">
 
-                <!-- 頂部快速切換膠囊 (仿圖片二：所有 / 最常聽 / 久未聽 / 所有歌曲) -->
+                <!-- 頂部快速切換膠囊 -->
                 <div class="stage-filter-bar">
                     <button id="chip-dashboard" class="filter-pill active" onclick="openHomeDashboard()">✨ 推薦總覽</button>
                     <button id="chip-all-songs" class="filter-pill" onclick="showSongList('all')">🎵 所有歌曲</button>
@@ -96,10 +97,10 @@
                     <button id="chip-least" class="filter-pill" onclick="scrollToSection('least-played-section')">🕰️ 很久沒聽</button>
                 </div>
 
-                <!-- 視圖 A：推薦總覽首頁 (Hero 橫幅 + 最常聽的歌曲 + 最少/很久沒聽的歌曲) -->
+                <!-- 視圖 A：推薦總覽首頁 -->
                 <div id="dashboard-view" class="dashboard-view">
 
-                    <!-- 漸層主視覺橫幅 (仿圖片二「開始使用」藍綠漸層大卡片) -->
+                    <!-- 漸層主視覺橫幅 -->
                     <div class="hero-banner">
                         <div class="hero-content">
                             <span class="hero-tag">🌙 深夜微光放鬆電台</span>
@@ -151,6 +152,7 @@
                             <p id="list-subtitle">點擊任一首歌曲立即開始播放</p>
                             <div class="playlist-hero-btns">
                                 <button class="hero-play-btn" onclick="playCurrentListFromStart()">▶ 播放此歌單</button>
+                                <button id="edit-current-pl-btn" class="hero-link-btn hidden" onclick="editCurrentCustomPlaylist()">✏️ 編輯此歌單歌曲</button>
                                 <button class="back-btn" onclick="openHomeDashboard()">‹ 返回推薦總覽</button>
                             </div>
                         </div>
@@ -161,7 +163,58 @@
 
             </div>
 
-            <!-- ================= 2. 新增歌曲分頁 (電腦端專用) ================= -->
+            <!-- ================= 2. 建立與編輯歌單分頁 (手機、電腦皆可直接免後台操作！) ================= -->
+            <div id="playlist-tab" class="tab-content">
+                <div class="card">
+                    <h3 class="card-title">📂 建立或編輯分類歌單</h3>
+                    <p class="helper-text">
+                        手機與電腦皆可直接建立或修改歌單！輸入歌單名稱並勾選歌曲後即可儲存（若輸入相同名稱可直接更新覆蓋該歌單）。
+                    </p>
+                    <div id="local-playlist-form">
+                        <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 深夜放鬆、開車兜風)">
+                        <div class="memo-header-row" style="margin-top: 8px;">
+                            <h4 class="sub-heading" style="margin: 0;">勾選要收錄進歌單的歌曲：</h4>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="copy-pill-btn" onclick="toggleAllPlaylistCheckboxes(true)">全選</button>
+                                <button type="button" class="copy-pill-btn" onclick="toggleAllPlaylistCheckboxes(false)">全不選</button>
+                            </div>
+                        </div>
+                        <div id="playlist-songs-checkboxes" class="checkbox-list"></div>
+                        <button class="action-btn" onclick="createPlaylist()">💾 儲存歌單</button>
+                        <p id="playlist-status" class="status-msg"></p>
+                    </div>
+
+                    <hr class="divider">
+
+                    <h4 class="sub-heading">🗂️ 管理現有分類歌單（點擊「編輯」可載入修改）：</h4>
+                    <div id="manage-playlists-container"></div>
+                </div>
+            </div>
+
+            <!-- ================= 3. 📝 備忘錄分頁 (手機、電腦通用) ================= -->
+            <div id="memo-tab" class="tab-content">
+                <div class="card">
+                    <h3 class="card-title">📝 待下載歌曲備忘錄</h3>
+                    <p class="helper-text">
+                        外出用手機滑到想聽的歌？先存進這裡。等回家打開電腦後台時，點擊下方「一鍵複製資料」貼上就能批次下載！
+                    </p>
+                    <input type="text" id="memo-url" placeholder="請貼上 YouTube 網址">
+                    <input type="text" id="memo-title" placeholder="歌曲名稱">
+                    <input type="text" id="memo-artist" placeholder="歌手名稱">
+                    <input type="text" id="memo-filename" placeholder="英文副檔名 (例如: zuijin)">
+                    <button class="action-btn" onclick="addToMemo()">💾 存入備忘錄</button>
+                    
+                    <hr class="divider">
+                    
+                    <div class="memo-header-row">
+                        <h4 class="sub-heading" style="margin: 0;">📋 待下載清單</h4>
+                        <button class="copy-pill-btn" onclick="copyMemoData()">一鍵複製資料</button>
+                    </div>
+                    <div id="memo-list-container"></div>
+                </div>
+            </div>
+
+            <!-- ================= 4. 新增歌曲分頁 (僅在電腦啟動 Python 後台時自動顯示) ================= -->
             <div id="add-tab" class="tab-content">
                 <div class="card">
                     <h3 class="card-title">📥 從 YouTube 下載新歌曲</h3>
@@ -180,56 +233,13 @@
                         
                         <p id="add-status" class="status-msg"></p>
                     </div>
-                    <div id="github-add-msg" class="hidden-msg hidden">
-                        <p>💡 提示：手機網頁版不支援直接下載歌曲。請先使用「📝 備忘錄」功能存起網址，等用電腦打開後台時再一起批次下載！</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ================= 3. 建立歌單分頁 ================= -->
-            <div id="playlist-tab" class="tab-content">
-                <div class="card">
-                    <h3 class="card-title">📂 建立新分類歌單</h3>
-                    <div id="local-playlist-form">
-                        <input type="text" id="new-playlist-name" placeholder="歌單名稱 (例如: 深夜放鬆、午後咖啡)">
-                        <h4 class="sub-heading">勾選要歸類進去的歌曲：</h4>
-                        <div id="playlist-songs-checkboxes" class="checkbox-list"></div>
-                        <button class="action-btn" onclick="createPlaylist()">確認儲存歌單</button>
-                        <p id="playlist-status" class="status-msg"></p>
-                    </div>
-                    <div id="github-playlist-msg" class="hidden-msg hidden">
-                        <p>💡 提示：手機網頁版不支援修改歌單。請在電腦上執行 <code>python app.py</code> 來進行歌單分類與儲存！</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ================= 4. 📝 備忘錄分頁 (手機、電腦通用) ================= -->
-            <div id="memo-tab" class="tab-content">
-                <div class="card">
-                    <h3 class="card-title">📝 待下載歌曲備忘錄</h3>
-                    <p class="helper-text">
-                        在手機上滑到想聽的歌？先存進這裡。等回到電腦前，點擊下方「一鍵複製資料」，傳到電腦貼上就能批次下載！
-                    </p>
-                    <input type="text" id="memo-url" placeholder="請貼上 YouTube 網址">
-                    <input type="text" id="memo-title" placeholder="歌曲名稱">
-                    <input type="text" id="memo-artist" placeholder="歌手名稱">
-                    <input type="text" id="memo-filename" placeholder="英文副檔名 (例如: zuijin)">
-                    <button class="action-btn" onclick="addToMemo()">💾 存入備忘錄</button>
-                    
-                    <hr class="divider">
-                    
-                    <div class="memo-header-row">
-                        <h4 class="sub-heading" style="margin: 0;">📋 待下載清單</h4>
-                        <button class="copy-pill-btn" onclick="copyMemoData()">一鍵複製資料</button>
-                    </div>
-                    <div id="memo-list-container"></div>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- ================= 底部常駐播放器控制列 (仿圖片二 Spotify 底部播放列) ================= -->
+    <!-- ================= 底部常駐播放器控制列 ================= -->
     <footer id="player-view" class="bottom-player-bar">
         <audio id="audio" playsinline></audio>
 
@@ -268,6 +278,6 @@
         </div>
     </footer>
 
-    <script src="script.js?v=20261024_v4"></script>
+    <script src="script.js?v=20261024_v5"></script>
 </body>
 </html>
