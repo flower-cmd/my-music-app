@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#121212">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="我的私人音樂盒 PRO">
     <title>我的私人音樂盒 PRO</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -38,7 +43,7 @@
                 <button class="back-btn" onclick="backToSongList()">⬅️ 返回歌曲清單</button>
                 <h2 id="title">歌曲載入中...</h2>
                 <p id="artist">歌手名稱</p>
-                <audio id="audio"></audio>
+                <audio id="audio" playsinline></audio>
                 <div class="progress-container" id="progress-container">
                     <div class="progress" id="progress"></div>
                 </div>

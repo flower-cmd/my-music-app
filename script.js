@@ -22,6 +22,7 @@ async function init() {
     await checkEnvironment();
     await loadAllSongs();
     setupAudioEvents();
+    setupMediaSessionHandlers();
     renderMemo(); // 👈 初始化載入備忘錄
 }
 
@@ -216,10 +217,58 @@ function loadSong(song) {
     title.innerText = song.title;
     artist.innerText = song.artist;
     audio.src = song.src;
+    updateMediaSession(song);
 }
 
-function playSong() { isPlaying = true; playBtn.innerText = '⏸ 暫停'; audio.play(); }
-function pauseSong() { isPlaying = false; playBtn.innerText = '▶ 播放'; audio.pause(); }
+function updateMediaSession(song) {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: song.title,
+            artist: song.artist
+        });
+    }
+}
+
+function setupMediaSessionHandlers() {
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', () => {
+            playSong();
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+            pauseSong();
+        });
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            prevSong();
+        });
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            nextSong();
+        });
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+            if (details.fastSeek && 'fastSeek' in audio) {
+                audio.fastSeek(details.seekTime);
+                return;
+            }
+            audio.currentTime = details.seekTime;
+        });
+    }
+}
+
+function playSong() {
+    isPlaying = true;
+    playBtn.innerText = '⏸ 暫停';
+    audio.play();
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+    }
+}
+function pauseSong() {
+    isPlaying = false;
+    playBtn.innerText = '▶ 播放';
+    audio.pause();
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+    }
+}
 
 playBtn.addEventListener('click', () => { if (isPlaying) { pauseSong(); } else { playSong(); } });
 

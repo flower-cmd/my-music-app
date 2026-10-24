@@ -1,0 +1,8 @@
+{
+    "name": "我的私人音樂盒 PRO",
+    "short_name": "音樂盒 PRO",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#121212"
+}
